@@ -1,0 +1,193 @@
+**Last Review Date:** 2025-03-27
+**Rule Name:** User Advanced Audit License Disabled
+
+## Goal / Hypothesis
+
+To detect when a user’s Microsoft 365 Advanced Audit logging license has been disabled, potentially indicating an adversary or insider attempting to evade detection by limiting audit trails.
+
+## Categorization
+
+Defense Evasion (TA0005) → Impair Defenses: Disable or Modify Audit Logging (T1562)[https://attack.mitre.org/techniques/T1562/]
+
+## Supported Modules
+
+   | **Service** | Event Source                                         | Dataset                                |
+|-------------|------------------------------------------------------|----------------------------------------|
+| Microsoft 365 | [Azure AD Audit Logs](https://eventmaturitymatrix.com/#microsoft_365-azure-active-directory-audit-logs) | `o365_audit_azure_active_directory` |
+
+## Technical Context
+### **Service Context**
+Advanced Audit logging in Microsoft 365 provides critical forensic capabilities, including detailed logs of sensitive actions within the tenant. This feature extends the default retention period and captures more comprehensive user and admin activities, particularly useful during incident response and forensic investigations.
+
+Disabling Advanced Audit logging licenses significantly impairs visibility, allowing malicious actors to conceal unauthorized actions within the environment. Typically, only administrators or privileged users have permission to modify these licenses.
+
+### **Threat Context**
+Attackers, malicious insiders, or even negligent administrators may disable audit logging as part of defense evasion strategies, making detection and attribution difficult or impossible.
+
+Real-world adversaries frequently disable logging to avoid generating records of their actions. MITRE ATT&CK references multiple advanced persistent threat (APT) groups (e.g., APT29, APT41) leveraging similar tactics for operational security and defense evasion purposes.
+
+## Detection Strategy Abstract
+This detection triggers under the following conditions:
+
+- The event code matches one of the following:
+
+  - **Change user license.**
+
+  - **Update user.**
+
+- The Advanced Audit license (identified by GUID: 2f442157-a11c-46b9-ae5b-6e39ff4e5849) is explicitly disabled (labels.license_disabled contains 2f442157-a11c-46b9-ae5b-6e39ff4e5849).
+
+- The actor performing this change is not the system account (user.roles !contains 'System'), ensuring system-initiated events don't trigger unnecessary alerts.
+
+
+This logic ensures alerts are raised specifically for intentional disabling of Advanced Audit logging by users.
+
+## Log Sample
+Example Audit Log Entry
+```json
+{
+    "Actor":
+    [
+        {
+            "ID": "M365 License Manager",
+            "Type": 1
+        },
+        {
+            "ID": "aeb86249-8ea3-49e2-900b-54cc8e308f85",
+            "Type": 2
+        },
+        {
+            "ID": "ServicePrincipal_d6c26d53-ca77-41b8-aa91-27f3b317bada",
+            "Type": 2
+        },
+        {
+            "ID": "d6c26d53-ca77-41b8-aa91-27f3b317bada",
+            "Type": 2
+        },
+        {
+            "ID": "ServicePrincipal",
+            "Type": 2
+        }
+    ],
+    "ActorContextId": "fabb61b8-3afe-4e75-b934-a47f782b8cd7",
+    "AzureActiveDirectoryEventType": 1,
+    "CreationTime": "2025-03-27T18:28:45",
+    "ExtendedProperties":
+    [
+        {
+            "Name": "additionalDetails",
+            "Value": "{\"id\":\"6023c7a0-e917-4188-91b3-737f0a6af863\",\"seq\":\"10\",\"b\":\"2022-04-25T04:21:32.2428728Z\\\\\\\",\\\\\\\"DisabledPlans\\\\\\\":[\\\\\\\"8c098270-9dd4-4350-9b30-ba4703f3b36b\\\\\\\",\\\\\\\"70d33638-9c74-4d01-bfd3-562de28bd4ba\\\\\\\",\\\\\\\"3fb82609-8c27-4f7b-bd51-30634711ee67\\\\\\\",\\\\\\\"afa73018-811e-46e9-988f-f75d2b1b8430\\\\\\\",\\\\\\\"41fcdd7d-4733-4863-9cf4-c65b83ce2df4\\\\\\\",\\\\\\\"6dc145d6-95dd-4191-b9c3-185575ee6f6b\\\\\\\",\\\\\\\"6db1f1db-2b46-403f-be40-e39395f08dbb\\\\\\\",\\\\\\\"46129a58-a698-46f0-aa5b-17f6586297d9\\\\\\\",\\\\\\\"28b0fa46-c39a-4188-89e2-58e979a6b014\\\\\\\",\\\\\\\"8c7d2df8-86f0-4902-b2ed-a0458298f3b3\\\\\\\",\\\\\\\"4de31727-a228-4ec3-a5bf-8e45b5ca48cc\\\\\\\",\\\\\\\"531ee2f8-b1cb-453b-9c21-d2180d014ca5\\\\\\\",\\\\\\\"34c0d7a0-a70f-4668-9238-47f9fc208882\\\\\\\",\\\\\\\"efb87545-963c-4e0d-99df-69c6916d9eb0\\\\\\\",\\\\\\\"07699545-9485-468e-95b6-2fca3738be01\\\\\\\",\\\\\\\"e212cbc7-0961-4c40-9825-01117710dcb1\\\\\\\",\\\\\\\"a6520331-d7d4-4276-95f5-15c0933bc757\\\\\\\",\\\\\\\"c4801e8a-cb58-4c35-aca6-f2dcc106f287\\\\\\\",\\\\\\\"e26c2fcc-ab91-4a61-b35c-03cdc8dddf66\\\\\\\",\\\\\\\"0898bdbb-73b0-471a-81e5-20f1fe4dd66e\\\\\\\",\\\\\\\"9f431833-0334-42de-a7dc-70aa40db46db\\\\\\\",\\\\\\\"2f442157-a11c-46b9-ae5b-6e39ff4e5849\\\\\\\",\\\\\\\"4828c8ec-dc2e-4779-b502-87ac9ce28ab7\\\\\\\",\\\\\\\"0feaeb32-d00e-4d66-bd5a-43b5b83db82c\\\\\\\",\\\\\\\"199a5c09-e0ca-4e37-8f7c-b05d533e1ea2\\\\\\\",\\\\\\\"a413a9ff-720c-4822-98ef-2f37c2a21f4c\\\\\\\",\\\\\\\"5136a095-5cf0-4aff-bec3-e84448b38ea5\\\\\\\",\\\\\\\"efb0351d-3b08-4503-993d-383af8de41e3\\\\\\\",\\\\\\\"cd31b152-6326-4d1b-ae1b-997b625182e6\\\\\\\",\\\\\\\"bf28f719-7844-4079-9c78-c1307898e192\\\\\\\",\\\\\\\"33c4f319-9bdd-48d6-9c4d-410b750a4a5a\\\\\\\",\\\\\\\"43de0ff5-c92c-492b-9116-175376d08c38\\\\\\\",\\\\\\\"b1188c4c-1b36-4018-b48b-ee07604f6feb\\\\\\\",\\\\\\\"9c0dab89-a30c-4117-86e7-97bda240acd2\\\\\\\",\\\\\\\"ded3d325-1bdc-453e-8432-5bac26d7a014\\\\\\\",\\\\\\\"617b097b-4b93-4ede-83de-5f075bb5fb2f\\\\\\\",\\\\\\\"b737dad2-2f6c-4c65-90e3-ca563267e8b9\\\\\\\",\\\\\\\"b21a6b06-1988-436e-a07b-51ec6d9f52ad\\\\\\\",\\\\\\\"65cc641f-cccd-4643-97e0-a17e3045e541\\\\\\\",\\\\\\\"bea4c11e-220a-4e6d-8eb8-8ea15d019f90\\\\\\\",\\\\\\\"5dbe027f-2339-4123-9542-606e4d348a72\\\\\\\",\\\\\\\"e95bec33-7c88-4a70-8e19-b10bd9d0c014\\\\\\\",\\\\\\\"6c6042f5-6f01-4d67-b8c1-eb99d36eed3e\\\\\\\",\\\\\\\"a23b959c-7ce8-4e57-9140-b90eb88a9e97\\\\\\\",\\\\\\\"8e0c0a52-6a6c-4d40-8370-dd62790dcd70\\\\\\\",\\\\\\\"b76fb638-6ba6-402a-b9f9-83d28acb3d86\\\\\\\",\\\\\\\"4a51bca5-1eff-43f5-878c-177680f191af\\\\\\\",\\\\\\\"7547a3fe-08ee-4ccb-b430-5077c5041653\\\\\\\"],\\\\\\\"EncodingVersion\\\\\\\":2},{\\\\\\\"ReferenceObjectId\\\\\\\":\\\\\\\"628fdd26-154a-4d67-a5e2-09facbf03990\\\\\\\",\\\\\\\"Status\\\\\\\":0,\\\\\\\"AccountId\\\\\\\":\\\\\\\"fabb61b8-3afe-4e75-b934-a47f782b8cd7\\\\\\\",\\\\\\\"SkuId\\\\\\\":\\\\\\\"c7df2760-2c81-4ef7-b578-5b5392b571df\\\\\\\",\\\\\\\"Error\\\\\\\":0,\\\\\\\"StatusUpdateTimestamp\\\\\\\":\\\\\\\"2022-04-25T02:51:34.4230785Z\\\\\\\",\\\\\\\"DisabledPlans\\\\\\\":[\\\\\\\"8c098270-9dd4-4350-9b30-ba4703f3b36b\\\\\\\",\\\\\\\"70d33638-9c74-4d01-bfd3-562de28bd4ba\\\\\\\",\\\\\\\"3fb82609-8c27-4f7b-bd51-30634711ee67\\\\\\\",\\\\\\\"afa73018-811e-46e9-988f-f75d2b1b8430\\\\\\\",\\\\\\\"41fcdd7d-4733-4863-9cf4-c65b83ce2df4\\\\\\\",\\\\\\\"6dc145d6-95dd-4191-b9c3-185575ee6f6b\\\\\\\",\\\\\\\"6db1f1db-2b46-403f-be40-e39395f08dbb\\\\\\\",\\\\\\\"46129a58-a698-46f0-aa5b-17f6586297d9\\\\\\\",\\\\\\\"28b0fa46-c39a-4188-89e2-58e979a6b014\\\\\\\",\\\\\\\"8c7d2df8-86f0-4902-b2ed-a0458298f3b3\\\\\\\",\\\\\\\"4de31727-a228-4ec3-a5bf-8e45b5ca48cc\\\\\\\",\\\\\\\"531ee2f8-b1cb-453b-9c21-d2180d014ca5\\\\\\\",\\\\\\\"34c0d7a0-a70f-4668-9238-47f9fc208882\\\\\\\",\\\\\\\"efb87545-963c-4e0d-99df-69c6916d9eb0\\\\\\\",\\\\\\\"07699545-9485-468e-95b6-2fca3738be01\\\\\\\",\\\\\\\"e212cbc7-0961-4c40-9825-01117710dcb1\\\\\\\",\\\\\\\"a6520331-d7d4-4276-95f5-15c0933bc757\\\\\\\",\\\\\\\"c4801e8a-cb58-4c35-aca6-f2dcc106f287\\\\\\\",\\\\\\\"e26c2fcc-ab91-4a61-b35c-03cdc8dddf66\\\\\\\",\\\\\\\"0898bdbb-73b0-471a-81e5-20f1fe4dd66e\\\\\\\",\\\\\\\"9f431833-0334-42de-a7dc-70aa40db46db\\\\\\\",\\\\\\\"2f442157-a11c-46b9-ae5b-6e39ff4e5849\\\\\\\",\\\\\\\"4828c8ec-dc2e-4779-b502-87ac9ce28ab7\\\\\\\",\\\\\\\"3e26ee1f-8a5f-4d52-aee2-b81ce45c8f40\\\\\\\",\\\\\\\"0feaeb32-d00e-4d66-bd5a-43b5b83db82c\\\\\\\",\\\\\\\"199a5c09-e0ca-4e37-8f7c-b05d533e1ea2\\\\\\\",\\\\\\\"a413a9ff-720c-4822-98ef-2f37c2a21f4c\\\\\\\",\\\\\\\"5136a095-5cf0-4aff-bec3-e84448b38ea5\\\\\\\",\\\\\\\"efb0351d-3b08-4503-993d-383af8de41e3\\\\\\\",\\\\\\\"cd31b152-6326-4d1b-ae1b-997b625182e6\\\\\\\",\\\\\\\"bf28f719-7844-4079-9c78-c1307898e192\\\\\\\",\\\\\\\"33c4f319-9bdd-48d6-9c4d-410b750a4a5a\\\\\\\",\\\\\\\"43de0ff5-c92c-492b-9116-175376d08c38\\\\\\\",\\\\\\\"b1188c4c-1b36-4018-b48b-ee07604f6feb\\\\\\\",\\\\\\\"9c0dab89-a30c-4117-86e7-97bda240acd2\\\\\\\",\\\\\\\"ded3d325-1bdc-453e-8432-5bac26d7a014\\\\\\\",\\\\\\\"617b097b-4b93-4ede-83de-5f075bb5fb2f\\\\\\\",\\\\\\\"b737dad2-2f6c-4c65-90e3-ca563267e8b9\\\\\\\",\\\\\\\"b21a6b06-1988-436e-a07b-51ec6d9f52ad\\\\\\\",\\\\\\\"65cc641f-cccd-4643-97e0-a17e3045e541\\\\\\\",\\\\\\\"bea4c11e-220a-4e6d-8eb8-8ea15d019f90\\\\\\\",\\\\\\\"e95bec33-7c88-4a70-8e19-b10bd9d0c014\\\\\\\",\\\\\\\"6c6042f5-6f01-4d67-b8c1-eb99d36eed3e\\\\\\\",\\\\\\\"a23b959c-7ce8-4e57-9140-b90eb88a9e97\\\\\\\",\\\\\\\"57ff2da0-773e-42df-b2af-ffb7a2317929\\\\\\\",\\\\\\\"8e0c0a52-6a6c-4d40-8370-dd62790dcd70\\\\\\\",\\\\\\\"b76fb638-6ba6-402a-b9f9-83d28acb3d86\\\\\\\",\\\\\\\"4a51bca5-1eff-43f5-878c-177680f191af\\\\\\\",\\\\\\\"7547a3fe-08ee-4ccb-b430-5077c5041653\\\\\\\"],\\\\\\\"EncodingVersion\\\\\\\":2},{\\\\\\\"ReferenceObjectId\\\\\\\":\\\\\\\"628fdd26-154a-4d67-a5e2-09facbf03990\\\\\\\",\\\\\\\"Status\\\\\\\":0,\\\\\\\"AccountId\\\\\\\":\\\\\\\"fabb61b8-3afe-4e75-b934-a47f782b8cd7\\\\\\\",\\\\\\\"SkuId\\\\\\\":\\\\\\\"a403ebcc-fae0-4ca2-8c8c-7a907fd6c235\\\\\\\",\\\\\\\"Error\\\\\\\":0,\\\\\\\"StatusUpdateTimestamp\\\\\\\":\\\\\\\"2022-04-25T02:51:34.4230785Z\\\\\\\",\\\\\\\"DisabledPlans\\\\\\\":[],\\\\\\\"EncodingVersion\\\\\\\":2},{\\\\\\\"ReferenceObjectId\\\\\\\":\\\\\\\"78a852ec-fe46-488b-8df9-89f0ef11b107\\\\\\\",\\\\\\\"Status\\\\\\\":0,\\\\\\\"AccountId\\\\\\\":\\\\\\\"fabb61b8-3afe-4e75-b934-a47f782b8cd7\\\\\\\",\\\\\\\"SkuId\\\\\\\":\\\\\\\"c7df2760-2c81-4ef7-b578-5b5392b571df\\\\\\\",\\\\\\\"Error\\\\\\\":0,\\\\\\\"StatusUpdateTimestamp\\\\\\\":\\\\\\\"2022-04-25T00:29:04.6634246Z\\\\\\\",\\\\\\\"DisabledPlans\\\\\\\":[\\\\\\\"8c098270-9dd4-4350-9b30-ba4703f3b36b\\\\\\\",\\\\\\\"70d33638-9c74-4d01-bfd3-562de28bd4ba\\\\\\\",\\\\\\\"3fb82609-8c27-4f7b-bd51-30634711ee67\\\\\\\",\\\\\\\"afa73018-811e-46e9-988f-f75d2b1b8430\\\\\\\",\\\\\\\"41fcdd7d-4733-4863-9cf4-c65b83ce2df4\\\\\\\",\\\\\\\"6dc145d6-95dd-4191-b9c3-185575ee6f6b\\\\\\\",\\\\\\\"6db1f1db-2b46-403f-be40-e39395f08dbb\\\\\\\",\\\\\\\"46129a58-a698-46f0-aa5b-17f6586297d9\\\\\\\",\\\\\\\"28b0fa46-c39a-4188-89e2-58e979a6b014\\\\\\\",\\\\\\\"8c7d2df8-86f0-4902-b2ed-a0458298f3b3\\\\\\\",\\\\\\\"4de31727-a228-4ec3-a5bf-8e45b5ca48cc\\\\\\\",\\\\\\\"531ee2f8-b1cb-453b-9c21-d2180d014ca5\\\\\\\",\\\\\\\"34c0d7a0-a70f-4668-9238-47f9fc208882\\\\\\\",\\\\\\\"efb87545-963c-4e0d-99df-69c6916d9eb0\\\\\\\",\\\\\\\"07699545-9485-468e-95b6-2fca3738be01\\\\\\\",\\\\\\\"e212cbc7-0961-4c40-9825-01117710dcb1\\\\\\\",\\\\\\\"a6520331-d7d4-4276-95f5-15c0933bc757\\\\\\\",\\\\\\\"c4801e8a-cb58-4c35-aca6-f2dcc106f287\\\\\\\",\\\\\\\"e26c2fcc-ab91-4a61-b35c-03cdc8dddf66\\\\\\\",\\\\\\\"0898bdbb-73b0-471a-81e5-20f1fe4dd66e\\\\\\\",\\\\\\\"9f431833-0334-42de-a7dc-70aa40db46db\\\\\\\",\\\\\\\"2f442157-a11c-46b9-ae5b-6e39ff4e5849\\\\\\\",\\\\\\\"4828c8ec-dc2e-4779-b502-87ac9ce28ab7\\\\\\\",\\\\\\\"3e26ee1f-8a5f-4d52-aee2-b81ce45c8f40\\\\\\\",\\\\\\\"0feaeb32-d00e-4d66-bd5a-43b5b83db82c\\\\\\\",\\\\\\\"199a5c09-e0ca-4e37-8f7c-b05d533e1ea2\\\\\\\",\\\\\\\"a413a9ff-720c-4822-98ef-2f37c2a21f4c\\\\\\\",\\\\\\\"5136a095-5cf0-4aff-bec3-e84448b38ea5\\\\\\\",\\\\\\\"efb0351d-3b08-4503-993d-383af8de41e3\\\\\\\",\\\\\\\"cd31b152-6326-4d1b-ae1b-997b625182e6\\\\\\\",\\\\\\\"bf28f719-7844-4079-9c78-c1307898e192\\\\\\\",\\\\\\\"33c4f319-9bdd-48d6-9c4d-410b750a4a5a\\\\\\\",\\\\\\\"43de0ff5-c92c-492b-9116-175376d08c38\\\\\\\",\\\\\\\"b1188c4c-1b36-4018-b48b-ee07604f6feb\\\\\\\",\\\\\\\"9c0dab89-a30c-4117-86e7-97bda240acd2\\\\\\\",\\\\\\\"ded3d325-1bdc-453e-8432-5bac26d7a014\\\\\\\",\\\\\\\"617b097b-4b93-4ede-83de-5f075bb5fb2f\\\\\\\",\\\\\\\"b737dad2-2f6c-4c65-90e3-ca563267e8b9\\\\\\\",\\\\\\\"b21a6b06-1988-436e-a07b-51ec6d9f52ad\\\\\\\",\\\\\\\"65cc641f-cccd-4643-97e0-a17e3045e541\\\\\\\",\\\\\\\"bea4c11e-220a-4e6d-8eb8-8ea15d019f90\\\\\\\",\\\\\\\"5dbe027f-2339-4123-9542-606e4d348a72\\\\\\\",\\\\\\\"e95bec33-7c88-4a70-8e19-b10bd9d0c014\\\\\\\",\\\\\\\"6c6042f5-6f01-4d67-b8c1-eb99d36eed3e\\\\\\\",\\\\\\\"57ff2da0-773e-42df-b2af-ffb7a2317929\\\\\\\",\\\\\\\"8e0c0a52-6a6c-4d40-8370-dd62790dcd70\\\\\\\",\\\\\\\"b76fb638-6ba6-402a-b9f9-83d28acb3d86\\\\\\\",\\\\\\\"4a51bca5-1eff-43f5-878c-177680f191af\\\\\\\",\\\\\\\"7547a3fe-08ee-4ccb-b430-5077c5041653\\\\\\\"],\\\\\\\"EncodingVersion\\\\\\\":2},{\\\\\\\"ReferenceObjectId\\\\\\\":\\\\\\\"7aec0512-dcda-4df1-8e3e-bcfabbbcf3be\\\\\\\",\\\\\\\"Status\\\\\\\":0,\\\\\\\"AccountId\\\\\\\":\\\\\\\"fabb61b8-3afe-4e75-b934-a47f782b8cd7\\\\\\\",\\\\\\\"SkuId\\\\\\\":\\\\\\\"c7df2760-2c81-4ef7-b578-5b5392b571df\\\\\\\",\\\\\\\"Error\\\\\\\":0,\\\\\\\"StatusUpdateTimestamp\\\\\\\":\\\\\\\"2022-04-24T23:33:09.6568779Z\\\\\\\",\\\\\\\"DisabledPlans\\\\\\\":[\\\\\\\"8c098270-9dd4-4350-9b30-ba4703f3b36b\\\\\\\",\\\\\\\"70d33638-9c74-4d01-bfd3-562de28bd4ba\\\\\\\",\\\\\\\"afa73018-811e-46e9-988f-f75d2b1b8430\\\\\\\",\\\\\\\"41fcdd7d-4733-4863-9cf4-c65b83ce2df4\\\\\\\",\\\\\\\"6dc145d6-95dd-4191-b9c3-185575ee6f6b\\\\\\\",\\\\\\\"6db1f1db-2b46-403f-be40-e39395f08dbb\\\\\\\",\\\\\\\"46129a58-a698-46f0-aa5b-17f6586297d9\\\\\\\",\\\\\\\"28b0fa46-c39a-4188-89e2-58e979a6b014\\\\\\\",\\\\\\\"8c7d2df8-86f0-4902-b2ed-a0458298f3b3\\\\\\\",\\\\\\\"4de31727-a228-4ec3-a5bf-8e45b5ca48cc\\\\\\\",\\\\\\\"531ee2f8-b1cb-453b-9c21-d2180d014ca5\\\\\\\",\\\\\\\"34c0d7a0-a70f-4668-9238-47f9fc208882\\\\\\\",\\\\\\\"efb87545-963c-4e0d-99df-69c6916d9eb0\\\\\\\",\\\\\\\"07699545-9485-468e-95b6-2fca3738be01\\\\\\\",\\\\\\\"e212cbc7-0961-4c40-9825-01117710dcb1\\\\\\\",\\\\\\\"a6520331-d7d4-4276-95f5-15c0933bc757\\\\\\\",\\\\\\\"c4801e8a-cb58-4c35-aca6-f2dcc106f287\\\\\\\",\\\\\\\"e26c2fcc-ab91-4a61-b35c-03cdc8dddf66\\\\\\\",\\\\\\\"0898bdbb-73b0-471a-81e5-20f1fe4dd66e\\\\\\\",\\\\\\\"9f431833-0334-42de-a7dc-70aa40db46db\\\\\\\",\\\\\\\"2f442157-a11c-46b9-ae5b-6e39ff4e5849\\\\\\\",\\\\\\\"4828c8ec-dc2e-4779-b502-87ac9ce28ab7\\\\\\\",\\\\\\\"3e26ee1f-8a5f-4d52-aee2-b81ce45c8f40\\\\\\\",\\\\\\\"0feaeb32-d00e-4d66-bd5a-43b5b83db82c\\\\\\\",\\\\\\\"199a5c09-e0ca-4e37-8f7c-b05d533e1ea2\\\\\\\",\\\\\\\"a413a9ff-720c-4822-98ef-2f37c2a21f4c\\\\\\\",\\\\\\\"5136a095-5cf0-4aff-bec3-e84448b38ea5\\\\\\\",\\\\\\\"efb0351d-3b08-4503-993d-383af8de41e3\\\\\\\",\\\\\\\"cd31b152-6326-4d1b-ae1b-997b625182e6\\\\\\\",\\\\\\\"bf28f719-7844-4079-9c78-c1307898e192\\\\\\\",\\\\\\\"33c4f319-9bdd-48d6-9c4d-410b750a4a5a\\\\\\\",\\\\\\\"43de0ff5-c92c-492b-9116-175376d08c38\\\\\\\",\\\\\\\"b1188c4c-1b36-4018-b48b-ee07604f6feb\\\\\\\",\\\\\\\"9c0dab89-a30c-4117-86e7-97bda240acd2\\\\\\\",\\\\\\\"ded3d325-1bdc-453e-8432-5bac26d7a014\\\\\\\",\\\\\\\"617b097b-4b93-4ede-83de-5f075bb5fb2f\\\\\\\",\\\\\\\"b737dad2-2f6c-4c65-90e3-ca563267e8b9\\\\\\\",\\\\\\\"b21a6b06-1988-436e-a07b-51ec6d9f52ad\\\\\\\",\\\\\\\"65cc641f-cccd-4643-97e0-a17e3045e541\\\\\\\",\\\\\\\"bea4c11e-220a-4e6d-8eb8-8ea15d019f90\\\\\\\",\\\\\\\"5dbe027f-2339-4123-9542-606e4d348a72\\\\\\\",\\\\\\\"e95bec33-7c88-4a70-8e19-b10bd9d0c014\\\\\\\",\\\\\\\"6c6042f5-6f01-4d67-b8c1-eb99d36eed3e\\\\\\\",\\\\\\\"a23b959c-7ce8-4e57-9140-b90eb88a9e97\\\\\\\",\\\\\\\"57ff2da0-773e-42df-b2af-ffb7a2317929\\\\\\\",\\\\\\\"8e0c0a52-6a6c-4d40-8370-dd62790dcd70\\\\\\\",\\\\\\\"b76fb638-6ba6-402a-b9f9-83d28acb3d86\\\\\\\",\\\\\\\"4a51bca5-1eff-43f5-878c-177680f191af\\\\\\\",\\\\\\\"7547a3fe-08ee-4ccb-b430-5077c5041653\\\\\\\"],\\\\\\\"EncodingVersion\\\\\\\":2},{\\\\\\\"ReferenceObjectId\\\\\\\":\\\\\\\"0a5d1912-4317-4ffc-9cea-5272cb14b6b7\\\\\\\",\\\\\\\"Status\\\\\\\":0,\\\\\\\"AccountId\\\\\\\":\\\\\\\"fabb61b8-3afe-4e75-b934-a47f782b8cd7\\\\\\\",\\\\\\\"SkuId\\\\\\\":\\\\\\\"c7df2760-2c81-4ef7-b578-5b5392b571df\\\\\\\",\\\\\\\"Error\\\\\\\":0,\\\\\\\"StatusUpdateTimestamp\\\\\\\":\\\\\\\"2022-04-24T22:59:44.0562934Z\\\\\\\",\\\\\\\"DisabledPlans\\\\\\\":[\\\\\\\"8c098270-9dd4-4350-9b30-ba4703f3b36b\\\\\\\",\\\\\\\"70d33638-9c74-4d01-bfd3-562de28bd4ba\\\\\\\",\\\\\\\"3fb82609-8c27-4f7b-bd51-30634711ee67\\\\\\\",\\\\\\\"afa73018-811e-46e9-988f-f75d2b1b8430\\\\\\\",\\\\\\\"41fcdd7d-4733-4863-9cf4-c65b83ce2df4\\\\\\\",\\\\\\\"6dc145d6-95dd-4191-b9c3-185575ee6f6b\\\\\\\",\\\\\\\"6db1f1db-2b46-403f-be40-e39395f08dbb\\\\\\\",\\\\\\\"46129a58-a698-46f0-aa5b-17f6586297d9\\\\\\\",\\\\\\\"28b0fa46-c39a-4188-89e2-58e979a6b014\\\\\\\",\\\\\\\"8c7d2df8-86f0-4902-b2ed-a0458298f3b3\\\\\\\",\\\\\\\"4de31727-a228-4ec3-a5bf-8e45b5ca48cc\\\\\\\",\\\\\\\"531ee2f8-b1cb-45\",\"c\":\"12\"}"
+        },
+        {
+            "Name": "extendedAuditEventCategory",
+            "Value": "User"
+        }
+    ],
+    "Id": "463a1ecd-ba3e-4b1c-9a08-83ee107e3406",
+    "InterSystemsId": "dba602b8-92ca-4657-9888-0707c4b7076d",
+    "IntraSystemId": "7b205d4c-a4c7-4334-8cf7-3415d2ffeba9",
+    "ModifiedProperties":
+    [],
+    "ObjectId": "ThomasA17@cvshealth.com",
+    "Operation": "Update user.",
+    "OrganizationId": "fabb61b8-3afe-4e75-b934-a47f782b8cd7",
+    "RecordType": 8,
+    "ResultStatus": "Success",
+    "SupportTicketId": "",
+    "Target":
+    [
+        {
+            "ID": "User_967d08c6-73ee-4a0c-a5a1-9fd81ed82d26",
+            "Type": 2
+        },
+        {
+            "ID": "967d08c6-73ee-4a0c-a5a1-9fd81ed82d26",
+            "Type": 2
+        },
+        {
+            "ID": "User",
+            "Type": 2
+        },
+        {
+            "ID": "ThomasA17@cvshealth.com",
+            "Type": 5
+        },
+        {
+            "ID": "1003BFFDA50E8497",
+            "Type": 3
+        }
+    ],
+    "TargetContextId": "fabb61b8-3afe-4e75-b934-a47f782b8cd7",
+    "UserId": "ServicePrincipal_d6c26d53-ca77-41b8-aa91-27f3b317bada",
+    "UserKey": "Not Available",
+    "UserType": 4,
+    "Version": 1,
+    "Workload": "AzureActiveDirectory"
+}
+```
+
+## Event Analysis
+### **BigQuery Research Query**
+```json
+SELECT
+  JSON_EXTRACT_SCALAR(user_role, '$') AS role,
+  JSON_EXTRACT_SCALAR(DATA, '$.labels.license_disabled') AS license_disabled,
+  event_code,
+  ingestion_time,
+  user_target_name,
+  org_id
+FROM `appomni-prod-us.threat_detection.assimilated`,
+  UNNEST(JSON_EXTRACT_ARRAY(DATA, '$.user.roles')) AS user_role
+WHERE
+  dataset = 'o365_audit_azure_active_directory'
+  AND event_code IN ('Change user license.', 'Update user.')
+  AND ingestion_time >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 6 HOUR)
+  AND JSON_EXTRACT_SCALAR(user_role, '$') != "System"
+  AND JSON_EXTRACT_SCALAR(DATA, '$.labels.license_disabled') LIKE '%2f442157-a11c-46b9-ae5b-6e39ff4e5849%'
+ORDER BY ingestion_time DESC
+```
+## Blind Spots and Blockers
+
+  -  License GUID Accuracy: Confirm the GUID 2f442157-a11c-46b9-ae5b-6e39ff4e5849 is current and corresponds specifically to Advanced Audit licensing.
+
+  -  System Account Identification: Confirm accuracy in differentiating "System" vs. user-initiated events. Misclassification can lead to false positives.
+
+  -  Intentional vs. Malicious Disabling: Legitimate administrative license changes could be mistaken as malicious. Policies regarding legitimate license adjustments should be reviewed to set appropriate thresholds.
+
+## False Positives
+
+  -  Administrative Oversight: Legitimate business activities (e.g., license reassignments or organizational restructuring) could unintentionally trigger this alert.
+
+  -  Regularly scheduled license adjustments or renewals might trigger false positives if not documented properly.
+
+## MITRE ATT&CK Mapping
+
+  -  Defense Evasion (TA0005) → Disable or Modify Audit Logging (T1562)
+
+## Validation / Trigger Steps
+
+To validate detection logic:
+
+  -  Access Microsoft 365 admin portal with privileged account.
+
+  -  Navigate to user licenses management.
+
+  -  Explicitly disable Advanced Audit license for a test user.
+
+  -  Confirm event ingestion in audit logs.
+
+  -  Validate detection triggers an alert accordingly.
+
+## Additional Resources
+
+  -  Microsoft Advanced Audit
+
+  -  Disable or Modify Audit Logging – MITRE ATT&CK
+
+## Deliverables
+
+  -  2025-03-27 - Rule review and research document creation: https://appomni.atlassian.net/browse/DRD-1926?atlOrigin=eyJpIjoiZTVlMmU5OTcyODZkNDgyYzkxOTRmZTA2ZmZiOTZmYTciLCJwIjoiaiJ9
+  -  2024-03-04 - Rule Creation: https://appomni.atlassian.net/browse/DRD-536?atlOrigin=eyJpIjoiNGExMjQ1NGZlYzU4NGUzNGE3MjYyNzgzM2I0YmE5NGUiLCJwIjoiaiJ9
+## Normalization Test
+
+    Parser Test Function: TestO365AdvancedAuditLicenseDisabled() in o365_audit_general_test.go

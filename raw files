@@ -1,0 +1,96 @@
+{
+  "Actor": [
+    {
+      "ID": "MS-PIM",
+      "Type": 1
+    },
+    {
+      "ID": "01fc33a7-78ba-4d2f-a4b7-768e336e890e",
+      "Type": 2
+    },
+    {
+      "ID": "ServicePrincipal_5a7aaa14-d8a0-4276-af83-0ba142958131",
+      "Type": 2
+    },
+    {
+      "ID": "5a7aaa14-d8a0-4276-af83-0ba142958131",
+      "Type": 2
+    },
+    {
+      "ID": "ServicePrincipal",
+      "Type": 2
+    }
+  ],
+  "ActorContextId": "54cc98ca-024a-4701-8548-3741e3b8d59d",
+  "AzureActiveDirectoryEventType": 1,
+  "CreationTime": "2025-03-17T20:59:25",
+  "ExtendedProperties": [
+    {
+      "Name": "additionalDetails",
+      "Value": "{}"
+    },
+    {
+      "Name": "extendedAuditEventCategory",
+      "Value": "Role"
+    }
+  ],
+  "Id": "db540557-7d40-4475-b6f4-5e45e03bfaca",
+  "InterSystemsId": "2a6cda8c-79a3-4c7b-b7fa-35bce5a49c06",
+  "IntraSystemId": "0893f7ea-e12f-410c-8cbb-50e8c0fae9e0",
+  "ModifiedProperties": [
+    {
+      "Name": "Role.ObjectID",
+      "NewValue": "f4fb4d85-8163-44e5-bc5a-98913ab890cf",
+      "OldValue": ""
+    },
+    {
+      "Name": "Role.DisplayName",
+      "NewValue": "Intune Administrator",
+      "OldValue": ""
+    },
+    {
+      "Name": "Role.TemplateId",
+      "NewValue": "3a2c62db-5318-420d-8d74-23affee5d9d5",
+      "OldValue": ""
+    },
+    {
+      "Name": "Role.WellKnownObjectName",
+      "NewValue": "IntuneServiceAdmins",
+      "OldValue": ""
+    }
+  ],
+  "ObjectId": "jack.ho_nrg.com#EXT#@vivint.onmicrosoft.com",
+  "Operation": "Add member to role.",
+  "OrganizationId": "54cc98ca-024a-4701-8548-3741e3b8d59d",
+  "RecordType": 8,
+  "ResultStatus": "Success",
+  "SupportTicketId": "",
+  "Target": [
+    {
+      "ID": "User_b8acd2f2-8d4c-493b-a18d-c8d89aa4cfef",
+      "Type": 2
+    },
+    {
+      "ID": "b8acd2f2-8d4c-493b-a18d-c8d89aa4cfef",
+      "Type": 2
+    },
+    {
+      "ID": "User",
+      "Type": 2
+    },
+    {
+      "ID": "jack.ho_nrg.com#EXT#@vivint.onmicrosoft.com",
+      "Type": 5
+    },
+    {
+      "ID": "1003200282B57CD1",
+      "Type": 3
+    }
+  ],
+  "TargetContextId": "54cc98ca-024a-4701-8548-3741e3b8d59d",
+  "UserId": "ServicePrincipal_5a7aaa14-d8a0-4276-af83-0ba142958131",
+  "UserKey": "Not Available",
+  "UserType": 4,
+  "Version": 1,
+  "Workload": "AzureActiveDirectory"
+}

@@ -1,0 +1,2122 @@
+# Docs: https://developer.okta.com/docs/reference/api/event-types/
+# This parser contains all known events listed in Okta Docs
+
+copy { src = 'raw_event_data', dest = 'okta.system' }
+set { dest = 'appomni.service.type', value = 'okta' }
+
+date { src = 'raw_event_data.published' }
+
+# new Okta event format
+rename { src = 'raw_event_data.event_type', dest = 'raw_event_data.eventType'}
+rename { src = 'raw_event_data.display_message', dest = 'raw_event_data.displayMessage'}
+rename { src = 'raw_event_data.debug_context', dest = 'raw_event_data.debugContext'}
+
+# actor
+rename { src = 'raw_event_data.actor.id', dest = 'user.id'}
+rename { src = 'raw_event_data.actor.displayName', dest = 'user.full_name'}
+rename { src = 'raw_event_data.actor.alternateId', dest = 'user.email'}
+copy { src = 'user.email', dest = 'user.name' }
+copy { src = 'raw_event_data.actor.type', dest = 'user.roles', append = true }
+
+# target
+foreach 'item' in 'raw_event_data.target' {
+  if ('item.type' == 'User' or 'item.type' == 'AppUser') {
+    copy { src = 'item.displayName', dest = 'user.target.full_name'}
+    copy { src = 'item.id', dest = 'user.target.id'}
+    copy { src = 'item.alternateId', dest = 'user.target.email'}
+    copy { src = 'user.target.email', dest = 'user.target.name' }
+  }
+  if ('item.type' == 'UserGroup') {
+    copy { src = 'item.displayName', dest = 'user.target.group.name'}
+    copy { src = 'item.id', dest = 'user.target.group.id'}
+  }
+  if ('item.type' not contains 'User') {
+    copy { src = 'item.displayName', dest = 'resource.name'}
+    copy { src = 'item.id', dest = 'resource.id'}
+    if ('item.type' == 'AppInstance') {
+      copy { src = 'resource.name', dest = 'application.name'}
+    }
+    if ('item.type' == 'PolicyEntity') {
+        set { dest = 'resource.type', value = 'policy' }
+        copy { src = 'item.detailEntry.policyType', dest = 'policy.category' }
+        copy { src = 'resource.name', dest = 'policy.name' }
+        copy { src = 'resource.id', dest = 'policy.id' }
+    }
+    if ('item.type' == 'PolicyRule') {
+        set { dest = 'resource.type', value = 'rule' }
+        copy { src = 'resource.name', dest = 'rule.name' }
+        copy { src = 'resource.id', dest = 'rule.uuid' }
+    }
+    if ('item.type' == 'BehaviorSettings') {
+        set { dest = 'resource.type', value = 'rule' }
+        copy { src = 'item.detailEntry.behaviorType', dest = 'rule.category' }
+        copy { src = 'resource.name', dest = 'rule.name' }
+        copy { src = 'resource.id', dest = 'rule.uuid' }
+    }
+  }
+}
+
+if ('user.target.name' not exists) {
+  copy { src = 'user.full_name', dest = 'user.target.full_name'}
+  copy { src = 'user.id', dest = 'user.target.id'}
+  copy { src = 'user.name', dest = 'user.target.name'}
+}
+
+# client ip
+parse_ip { src = 'raw_event_data.client.ipAddress', dest = 'source' }
+copy { src = 'source.ip', dest = 'source.ip'}
+copy { src = 'source.ip', dest = 'source.address'}
+
+# client
+rename { src = 'raw_event_data.client.userAgent.rawUserAgent', dest = 'user_agent.original'}
+rename { src = 'raw_event_data.client.userAgent.browser', dest = 'user_agent.name'}
+rename { src = 'raw_event_data.client.device', dest = 'source.host.type'}
+rename { src = 'raw_event_data.client.userAgent.os', dest = 'source.host.os.name'}
+
+# ip enrichment
+# rename { src = 'raw_event_data.client.geographicalContext.city', dest = 'source.geo.city_name'}
+# rename { src = 'raw_event_data.client.geographicalContext.state', dest = 'source.geo.region_name'}
+# rename { src = 'raw_event_data.client.geographicalContext.country', dest = 'source.geo.country_name'}
+# rename { src = 'raw_event_data.client.geographicalContext.geolocation.lon', dest = 'source.geo.location.lon'}
+# rename { src = 'raw_event_data.client.geographicalContext.geolocation.lat', dest = 'source.geo.location.lat'}
+# rename { src = 'raw_event_data.security_context.asNumber', dest = 'source.as.number'}
+# rename { src = 'raw_event_data.security_context.asOrg', dest = 'source.as.organization.name'}
+if ( 'raw_event_data.security_context.isProxy' == true ) {
+  append { dest = 'tags', value = 'is_proxy' }
+}
+
+# debug
+rename { src = 'raw_event_data.debugContext.debugData.requestUri', dest = 'event.url' }
+rename { src = 'raw_event_data.debugContext.debugData.origin', dest = 'destination.domain' }
+rename { src = 'raw_event_data.debugContext.debugData.signOnMode', dest = 'authentication.raw_method' }
+rename { src = 'raw_event_data.debugContext.debugData.factor', dest = 'labels.login_factor' }
+rename { src = 'raw_event_data.debugContext.debugData.initiationType', dest = 'labels.login_initiationType' }
+rename { src = 'raw_event_data.debugContext.debugData.loginResult', dest = 'labels.login_result' }
+rename { src = 'raw_event_data.debugContext.debugData.changedAttributes', dest = 'labels.changed_attributes' }
+rename { src = 'raw_event_data.debugContext.debugData.privilegeGranted', dest = 'labels.privilege_granted' }
+rename { src = 'raw_event_data.debugContext.debugData.appname', dest = 'application.name' }
+rename { src = 'raw_event_data.debugContext.debugData.dtHash', dest = 'labels.device_hash' }
+rename { src = 'raw_event_data.debugContext.debugData.threatSuspected', dest = 'labels.threat_suspected' }
+rename { src = 'raw_event_data.debugContext.debugData.anonymizerStatus', dest = 'labels.anonymizer_status' }
+rename { src = 'raw_event_data.debugContext.debugData.proxyType', dest = 'labels.proxy_type' }
+
+translate {
+    src = 'authentication.raw_method'
+    dest = 'authentication.method'
+    map = {
+        'OpenID Connect' = 'sso'
+        'SAML 2.0' = 'sso'
+        'Secure Web Authentication' = 'sso'
+    }
+}
+
+if ( 'raw_event_data.debugContext.debugData.newPolicyRuleRequirementsJson' contains '\"factorMode\":\"' ) {
+    regex_capture {
+        src = 'raw_event_data.debugContext.debugData.newPolicyRuleRequirementsJson'
+        dest = 'temp_new_factor_mode'
+        regex = '\"factorMode\":\"([^"\\]+)\"'
+    }
+    copy { src = 'temp_new_factor_mode.[0].[0]', dest = 'labels.new_factor_mode'}
+    del { src = 'temp_new_factor_mode' }
+}
+if ( 'raw_event_data.debugContext.debugData.oldPolicyRuleRequirementsJson' contains '\"factorMode\":\"' ) {
+    regex_capture {
+        src = 'raw_event_data.debugContext.debugData.oldPolicyRuleRequirementsJson'
+        dest = 'temp_old_factor_mode'
+        regex = '\"factorMode\":\"([^"\\]+)\"'
+    }
+    copy { src = 'temp_old_factor_mode.[0].[0]', dest = 'labels.old_factor_mode'}
+    del { src = 'temp_old_factor_mode' }
+}
+
+# debug & security data
+if ('raw_event_data.debugContext.debugData.logOnlySecurityData' exists) {
+  from_json { src = 'raw_event_data.debugContext.debugData.logOnlySecurityData' }
+  copy { src = 'raw_event_data.debugContext.debugData.logOnlySecurityData.risk.level', dest = 'labels.risk_level' }
+  copy { src = 'raw_event_data.debugContext.debugData.logOnlySecurityData.risk.reasons', dest = 'labels.risk_reasons' }
+  copy { src = 'raw_event_data.debugContext.debugData.logOnlySecurityData.behaviors', dest = 'labels.behaviors' }
+  copy { src = 'labels.behaviors.New Geo-Location', dest = 'labels.new_geo_location' }
+  copy { src = 'labels.behaviors.New Device', dest = 'labels.new_device' }
+  copy { src = 'labels.behaviors.New IP', dest = 'labels.new_ip' }
+  copy { src = 'labels.behaviors.New Country', dest = 'labels.new_country' }
+  copy { src = 'labels.behaviors.New State', dest = 'labels.new_state' }
+  copy { src = 'labels.behaviors.New City', dest = 'labels.new_city' }
+  copy { src = 'labels.behaviors.Velocity', dest = 'labels.velocity' }
+  del { src = 'labels.behaviors' }
+}
+
+if ('raw_event_data.debugContext.debugData.behaviors' exists) {
+  regex_capture {
+    src = 'raw_event_data.debugContext.debugData.behaviors'
+    dest = 'labels.new_geo_location'
+    regex = '^.*New\ Geo-Location=([A-Z]+).*$'
+  }
+  rename { src = 'labels.new_geo_location.[0].[0]', dest = 'labels.new_geo_location' }
+
+  regex_capture {
+    src = 'raw_event_data.debugContext.debugData.behaviors'
+    dest = 'labels.new_device'
+    regex = '^.*New\ Device=([A-Z]+).*$'
+  }
+  rename { src = 'labels.new_device.[0].[0]', dest = 'labels.new_device' }
+
+  regex_capture {
+    src = 'raw_event_data.debugContext.debugData.behaviors'
+    dest = 'labels.new_ip'
+    regex = '^.*New\ IP=([A-Z]+).*$'
+  }
+  rename { src = 'labels.new_ip.[0].[0]', dest = 'labels.new_ip' }
+
+  regex_capture {
+    src = 'raw_event_data.debugContext.debugData.behaviors'
+    dest = 'labels.new_country'
+    regex = '^.*New\ Country=([A-Z]+).*$'
+  }
+  rename { src = 'labels.new_country.[0].[0]', dest = 'labels.new_country' }
+
+  regex_capture {
+    src = 'raw_event_data.debugContext.debugData.behaviors'
+    dest = 'labels.new_state'
+    regex = '^.*New\ State=([A-Z]+).*$'
+  }
+  rename { src = 'labels.new_state.[0].[0]', dest = 'labels.new_state' }
+
+  regex_capture {
+    src = 'raw_event_data.debugContext.debugData.behaviors'
+    dest = 'labels.new_city'
+    regex = '^.*New\ City=([A-Z]+).*$'
+  }
+  rename { src = 'labels.new_city.[0].[0]', dest = 'labels.new_city' }
+
+  regex_capture {
+    src = 'raw_event_data.debugContext.debugData.behaviors'
+    dest = 'labels.velocity'
+    regex = '^.*Velocity=([A-Z]+).*$'
+  }
+  rename { src = 'labels.velocity.[0].[0]', dest = 'labels.velocity' }
+}
+
+# authentication
+rename { src = 'raw_event_data.authenticationContext.externalSessionId', dest = 'session.id' }
+rename { src = 'raw_event_data.authentication_context.externalSessionId', dest = 'session.id' }
+
+# default event
+rename { src = 'raw_event_data.displayMessage', dest = 'message' }
+rename { src = 'raw_event_data.uuid', dest = 'event.id'}
+rename { src = 'raw_event_data.transaction.type', dest = 'labels.transaction_type' }
+rename { src = 'raw_event_data.transaction.id', dest = 'labels.transaction_id' }
+
+to_lower { src = 'raw_event_data.outcome.result' }
+translate {
+  src = 'raw_event_data.outcome.result'
+  dest = 'event.outcome'
+  default = 'unknown'
+  map = {
+    'success' = 'success'
+    'allow' = 'success'
+    'failure' = 'failure'
+    'challenge' = 'unknown'
+    'skipped' = 'unknown'
+    'deny' = 'failure'
+    'deferred' = 'failure'
+  }
+}
+
+if ( 'raw_event_data.transaction.detail.requestApiTokenId' exists ) {
+  rename { src = 'raw_event_data.transaction.detail.requestApiTokenId', dest = 'labels.token_id' }
+  append { dest = 'tags', value = 'api_request' }
+}
+
+rename { src = 'raw_event_data.outcome.reason', dest = 'event.reason'}
+copy { src = 'raw_event_data.eventType', dest = 'event.code'}
+
+# event actions
+if ('raw_event_data.eventType' starts_with 'access') {
+  translate {
+    src = 'raw_event_data.eventType'
+    dest = 'event.action'
+    map = {
+        'access.request.cancel' = 'close_request'
+        'access.request.condition.activate' = 'enable_resource'
+        'access.request.condition.create' = 'create_request'
+        'access.request.condition.deactivate' = 'enable_resource'
+        'access.request.condition.delete' = 'delete_request'
+        'access.request.condition.invalidate' = 'expire_request'
+        'access.request.condition.update' = 'update_request'
+        'access.request.reject' = 'deny_request'
+        'access.request.sequence.create' = 'create_request'
+        'access.request.sequence.delete' = 'delete_request'
+        'access.request.sequence.update' = 'update_request'
+    }
+  }
+}
+
+if ('raw_event_data.eventType' starts_with 'access') {
+  translate {
+    src = 'raw_event_data.eventType'
+    dest = 'event.action'
+    map = {
+        'account.org.add' = 'add_resource'
+        'account.org.delete.cancel' = 'close_request'
+        'account.org.delete.request' = 'delete_request'
+        'account.org.product.update' = 'update_resource'
+        'account.org.status.update' = 'update_status'
+    }
+  }
+}
+
+if ('raw_event_data.eventType' starts_with 'analytics') {
+  set { dest = 'resource.type', value = 'report' }
+  translate {
+    src = 'raw_event_data.eventType'
+    dest = 'event.action'
+    map = {
+      'analytics.reports.export.download' = 'download_resource'
+      'analytics.reports.export.generate' = 'create_resource'
+      'analytics.reports.export.request' = 'request_access'
+      'analytics.feedback.provide' = 'alert_event'
+    }
+  }
+}
+
+if ('raw_event_data.eventType' starts_with 'app') {
+  if ('raw_event_data.eventType' starts_with 'app.access_request') {
+    translate {
+      src = 'raw_event_data.eventType'
+      dest = 'event.action'
+      map = {
+        'app.access_request.approver.approve' = 'approve_request'
+        'app.access_request.approver.deny' = 'deny_request'
+        'app.access_request.delete' = 'delete_request'
+        'app.access_request.deny' = 'deny_request'
+        'app.access_request.expire' = 'expire_request'
+        'app.access_request.grant' = 'approve_request'
+        'app.access_request.request' = 'request_access'
+      }
+    }
+  }
+  if ('raw_event_data.eventType' starts_with 'app.ad') {
+    translate {
+      src = 'raw_event_data.eventType'
+      dest = 'event.action'
+      map = {
+        'app.ad.api.user_import.account_locked' = 'lock_account'
+        'app.ad.api.user_import.warn.skipped_contact.attribute_invalid_value' = 'import_user'
+        'app.ad.api.user_import.warn.skipped_user.attribute_invalid_value' = 'import_user'
+        'app.ad.api.user_import.warn.skipped_user.missing_required_attribute' = 'import_user'
+      }
+    }
+  }
+  if ('raw_event_data.eventType' starts_with 'app.app_instance') {
+    translate {
+      src = 'raw_event_data.eventType'
+      dest = 'event.action'
+      map = {
+        'app.app_instance.csr.generate' = 'create_csr'
+        'app.app_instance.csr.publish' = 'publish_csr'
+        'app.app_instance.csr.revoke' = 'revoke_csr'
+        'app.app_instance.provision_synchronize_task.completed' = 'complete_task'
+        'app.app_instance.provision_synchronize_task.failed' = 'execute_task'
+        'app.app_instance.provision_synchronize_task.started' = 'start_task'
+        'app.app_instance.provision_sync_job.completed' = 'complete_workflow'
+        'app.app_instance.provision_sync_job.failed' = 'alert_event'
+        'app.app_instance.provision_sync_job.started' = 'execute_workflow'
+      }
+    }
+  }
+  if ('raw_event_data.eventType' starts_with 'app.audit_report') {
+    set { dest = 'resource.type', value = 'report'}
+    translate {
+      src = 'raw_event_data.eventType'
+      dest = 'event.action'
+      map = {
+        'app.audit_report.download.local.active' = 'download_resource'
+        'app.audit_report.download.local.deprov' = 'download_resource'
+        'app.audit_report.download.rogue.report' = 'download_resource'
+        'app.audit_report.download' = 'download_resource'
+      }
+    }
+  }
+  if ('raw_event_data.eventType' starts_with 'app.generic') {
+    if ('raw_event_data.eventType' == 'app.generic.unauth_app_access_attempt') {
+      set { dest = 'event.action', value = 'access_app'}
+      set { dest = 'event.outcome', value = 'failure'}
+    }
+  }
+  if ('raw_event_data.eventType' starts_with 'app.inbound_del_auth') {
+    if ('raw_event_data.eventType' == 'app.inbound_del_auth.login_success') {
+      set { dest = 'event.action', value = 'authenticate_user'}
+    }
+  }
+  if ('raw_event_data.eventType' starts_with 'app.kerberos_rich_client') {
+    translate {
+      src = 'raw_event_data.eventType'
+      dest = 'event.action'
+      map = {
+        'app.kerberos_rich_client.account_not_found' = 'authenticate_user'
+        'app.kerberos_rich_client.instance_not_found' = 'authenticate_user'
+        'app.kerberos_rich_client.multiple_accounts_found' = 'authenticate_user'
+        'app.kerberos_rich_client.user_authentication_successful' = 'authenticate_user'
+      }
+    }
+    if ('raw_event_data.eventType' == 'app.kerberos_rich_client.multiple_accounts_found') {
+      set { dest = 'event.outcome', value = 'failure'}
+    }
+  }
+  if ('raw_event_data.eventType' starts_with 'app.keys') {
+    translate {
+      src = 'raw_event_data.eventType'
+      dest = 'event.action'
+      map = {
+        'app.keys.clone' = 'copy_key'
+        'app.keys.delete' = 'delete_key'
+        'app.keys.generate' = 'create_key'
+        'app.keys.rotate' = 'update_key'
+      }
+    }
+  }
+  if ('raw_event_data.eventType' starts_with 'app.ldap') {
+    if ('raw_event_data.eventType' == 'app.ldap.password.change.failed') {
+      set { dest = 'event.action', value = 'update_password'}
+    }
+  }
+  if ('raw_event_data.eventType' starts_with 'app.oauth2') {
+    translate {
+      src = 'raw_event_data.eventType'
+      dest = 'event.action'
+      map = {
+        'app.oauth2.admin.consent.grant' = 'approve_access'
+        'app.oauth2.admin.consent.revoke' = 'revoke_access'
+        'app.oauth2.api_resource.create' = 'create_resource'
+        'app.oauth2.api_resource.delete' = 'delete_resource'
+        'app.oauth2.api_resource.update' = 'update_resource'
+        'app.oauth2.as.authorize' = 'request_authorization'
+        'app.oauth2.as.authorize.code' = 'request_authorization'
+        'app.oauth2.as.authorize.implicit.access_token' = 'request_token'
+        'app.oauth2.as.authorize.implicit.id_token' = 'request_token'
+        'app.oauth2.as.authorize.scope_denied' = 'deny_request'
+        'app.oauth2.as.consent.grant' = 'approve_access'
+        'app.oauth2.as.consent.revoke' = 'revoke_access'
+        'app.oauth2.as.consent.revoke.implicit.as' = 'revoke_access'
+        'app.oauth2.as.consent.revoke.implicit.client' = 'revoke_access'
+        'app.oauth2.as.consent.revoke.implicit.scope' = 'revoke_access'
+        'app.oauth2.as.consent.revoke.implicit.user' = 'revoke_access'
+        'app.oauth2.as.consent.revoke.user' = 'revoke_access'
+        'app.oauth2.as.consent.revoke.user.client' = 'revoke_access'
+        'app.oauth2.as.evaluate.claim' = 'evaluate_token'
+        'app.oauth2.as.interact.interaction_code' = 'authenticate_app'
+        'app.oauth2.as.interact.interaction_handle' = 'authenticate_app'
+        'app.oauth2.as.key.rollover' = 'update_key'
+        'app.oauth2.as.token.detect_reuse' = 'evaluate_token'
+        'app.oauth2.as.token.grant' = 'approve_token'
+        'app.oauth2.as.token.grant.access_token' = 'approve_token'
+        'app.oauth2.as.token.grant.device_secret' = 'approve_token'
+        'app.oauth2.as.token.grant.id_token' = 'approve_token'
+        'app.oauth2.as.token.grant.refresh_token' = 'update_token'
+        'app.oauth2.as.token.revoke' = 'revoke_token'
+        'app.oauth2.authorize' = 'request_authorization'
+        'app.oauth2.authorize.code' = 'request_authorization'
+        'app.oauth2.authorize.implicit.access_token' = 'request_token'
+        'app.oauth2.authorize.implicit.id_token' = 'request_token'
+        'app.oauth2.client.lifecycle.activate' = 'enable_app'
+        'app.oauth2.client.lifecycle.create' = 'create_app'
+        'app.oauth2.client.lifecycle.deactivate' = 'disable_app'
+        'app.oauth2.client.lifecycle.delete' = 'delete_app'
+        'app.oauth2.client.lifecycle.update' = 'update_app'
+        'app.oauth2.client.privilege.grant' = 'approve_access'
+        'app.oauth2.client.privilege.revoke' = 'revoke_access'
+        'app.oauth2.client.read_client_secret' = 'read_password'
+        'app.oauth2.client_id_rate_limit_warning' = 'alert_api'
+        'app.oauth2.consent.grant' = 'approve_access'
+        'app.oauth2.credentials.lifecycle.activate' = 'enable_resource'
+        'app.oauth2.credentials.lifecycle.create' = 'create_resource'
+        'app.oauth2.credentials.lifecycle.deactivate' = 'disable_resource'
+        'app.oauth2.credentials.lifecycle.delete' = 'delete_resource'
+        'app.oauth2.interact.interaction_code' = 'authenticate_app'
+        'app.oauth2.interact.interaction_handle' = 'authenticate_app'
+        'app.oauth2.invalid_client_credentials' = 'authenticate_app'
+        'app.oauth2.invalid_client_ids' = 'authenticate_app'
+        'app.oauth2.key.rollover' = 'update_key'
+        'app.oauth2.signon' = 'authenticate_user'
+        'app.oauth2.token.detect_reuse' = 'evaluate_token'
+        'app.oauth2.token.grant' = 'approve_token'
+        'app.oauth2.token.grant.access_token' = 'approve_token'
+        'app.oauth2.token.grant.id_token' = 'approve_token'
+        'app.oauth2.token.grant.refresh_token' = 'approve_token'
+        'app.oauth2.token.revoke' = 'revoke_token'
+        'app.oauth2.token.revoke.implicit.as' = 'revoke_token'
+        'app.oauth2.token.revoke.implicit.client' = 'revoke_token'
+        'app.oauth2.token.revoke.implicit.user' = 'revoke_token'
+        'app.oauth2.trusted_server.add' = 'add_resource'
+        'app.oauth2.trusted_server.delete' = 'delete_resource'
+      }
+    }
+    if ('raw_event_data.eventType' contains 'app.oauth2.credentials') {
+      set { dest = 'resource.type', value = 'credential' }
+    }
+    if ('raw_event_data.eventType' contains 'app.oauth2.invalid_client') {
+      set { dest = 'event.outcome', value = 'failure'}
+    }
+  }
+  if ('raw_event_data.eventType' starts_with 'app.office365') {
+    translate {
+      src = 'raw_event_data.eventType'
+      dest = 'event.action'
+      map = {
+        'app.office365.api.change.domain.federation.success' = 'update_setting'
+        'app.office365.api.error.ad.user' = 'update_user'
+        'app.office365.api.error.check.user.exists' = 'verify_user'
+        'app.office365.api.error.create.user' = 'create_user'
+        'app.office365.api.error.deactivate.user' = 'disable_user'
+        'app.office365.api.error.download.custom.objects' = 'download_resource'
+        'app.office365.api.error.download.groups' = 'download_resource'
+        'app.office365.api.error.download.users' = 'download_resource'
+        'app.office365.api.error.endpoint.unavailable' = 'read_resource'
+        'app.office365.api.error.get.company.dirsync.failure' = 'update_resource'
+        'app.office365.api.error.get.company.dirsync.status.failure' = 'update_resource'
+        'app.office365.api.error.get.company.dirsync.status.pending' = 'update_resource'
+        'app.office365.api.error.get.object.ids.by.group.id' = 'read_user'
+        'app.office365.api.error.group.create.failure' = 'create_group'
+        'app.office365.api.error.group.create.failure.name.in.use' = 'create_group'
+        'app.office365.api.error.group.delete.failure' = 'delete_group'
+        'app.office365.api.error.group.membership.update.assignment.failure' = 'update_group'
+        'app.office365.api.error.group.membership.update.failure' = 'update_group'
+        'app.office365.api.error.group.membership.update.group.not.found.failure' = 'update_group'
+        'app.office365.api.error.group.membership.update.removal.failure' = 'update_group'
+        'app.office365.api.error.group.update.failure' = 'update_group'
+        'app.office365.api.error.group.update.failure.not.found' = 'update_group'
+        'app.office365.api.error.import.profile' = 'import_account'
+        'app.office365.api.error.no.endpoints.found' = 'query_api'
+        'app.office365.api.error.push.password' = 'update_password'
+        'app.office365.api.error.push.profile' = 'update_user'
+        'app.office365.api.error.reactivate.user' = 'enable_user'
+        'app.office365.api.error.remove.domain.federation.failure' = 'delete_resource'
+        'app.office365.api.error.remove.domain.federation.failure.access.denied' = 'delete_resource'
+        'app.office365.api.error.remove.domain.federation.failure.domain.not.found' = 'delete_resource'
+        'app.office365.api.error.revoke.refresh.token' = 'revoke_token'
+        'app.office365.api.error.set.company.dirsync.failure' = 'update_resource'
+        'app.office365.api.error.set.company.dirsync.status.failure' = 'update_resource'
+        'app.office365.api.error.set.domain.federation.failure' = 'update_resource'
+        'app.office365.api.error.set.domain.federation.failure.access.denied' = 'update_resource'
+        'app.office365.api.error.set.domain.federation.failure.domain.default' = 'update_resource'
+        'app.office365.api.error.set.domain.federation.failure.domain.not.found' = 'update_resource'
+        'app.office365.api.error.sync.contact' = 'synchronize_resource'
+        'app.office365.api.error.sync.finalize' = 'synchronize_resource'
+        'app.office365.api.error.sync.group' = 'synchronize_resource'
+        'app.office365.api.error.sync.not.activated' = 'synchronize_resource'
+        'app.office365.api.error.sync.set.attribute' = 'update_setting'
+        'app.office365.api.error.sync.user' = 'synchronize_user'
+        'app.office365.api.error.unable.to.create.graph.client' = 'create_resource'
+        'app.office365.api.error.validate.admin.creds' = 'authenticate_app'
+        'app.office365.api.error.validate.creds' = 'authenticate_app'
+        'app.office365.api.error.validate.creds.unknown.exception' = 'authenticate_app'
+        'app.office365.api.error.x-ms-forwarded-client-ip-header.absent' = 'query_api'
+        'app.office365.api.remove.domain.federation.success' = 'remove_domain'
+        'app.office365.api.set.domain.federation.success' = 'add_domain'
+        'app.office365.api.set.wsfed.configure.type.success' = 'update_setting'
+        'app.office365.api.sync.complete' = 'synchronize_user'
+        'app.office365.api.sync.heartbeat.sent' = 'send_heartbeart'
+        'app.office365.api.sync.job.complete' = 'synchronize_task'
+        'app.office365.api.sync.job.complete.contact' = 'synchronize_account'
+        'app.office365.api.sync.job.complete.group' = 'synchronize_group'
+        'app.office365.api.sync.job.complete.user' = 'synchronize_user'
+        'app.office365.clientplatform.conversion.job.processing.app.instance' = 'create_app'
+        'app.office365.clientplatform.conversion.job.skipping.migration' = 'alert_event'
+        'app.office365.dirsync.skipping.conflict-object' = 'alert_event'
+        'app.office365.dirsync.skipping.critical-system-object' = 'alert_event'
+        'app.office365.dirsync.skipping.non-security-group-invalid-mail' = 'alert_event'
+        'app.office365.dirsync.skipping.reserved-attribute-value' = 'alert_event'
+        'app.office365.dirsync.skipping.systemmailbox' = 'alert_event'
+        'app.office365.dirsync.skipping.without-name-and-displayname' = 'alert_event'
+        'app.office365.error.importing.user' = 'import_user'
+        'app.office365.graph.api.error.no.mailbox.found' = 'alert_event'
+        'app.office365.graph.api.error.rate-limit.exceeded' = 'alert_event'
+        'app.office365.graph.api.error.service.principal.creation.failed' = 'create_account'
+        'app.office365.graph.api.error.service.principal.msgraph.authentication.failure' = 'create_account'
+        'app.office365.license.conversion.jo.begin.migration.gaas.v1.to.v0' = 'start_task'
+        'app.office365.license.conversion.job.begin.downloading.custom.objects' = 'download_resource'
+        'app.office365.license.conversion.job.begin.migration.gaas.v0.to.v1' = 'start_task'
+        'app.office365.license.conversion.job.begin.migration.users.v0.to.v1' = 'start_task'
+        'app.office365.license.conversion.job.begin.migration.users.v1.to.v0' = 'start_task'
+        'app.office365.license.conversion.job.download.or.migration.failed' = 'download_resource'
+        'app.office365.license.conversion.job.end.count.migration.gaas.v0.to.v1' = 'end_task'
+        'app.office365.license.conversion.job.end.count.migration.gaas.v1.to.v0' = 'end_task'
+        'app.office365.license.conversion.job.end.count.migration.users.v0.to.v1' = 'end_task'
+        'app.office365.license.conversion.job.end.count.migration.users.v1.to.v0' = 'end_task'
+        'app.office365.license.conversion.job.end.downloading.custom.objects' = 'download_resource'
+        'app.office365.license.conversion.job.end.migration.gaas.v0.to.v1' = 'end_task'
+        'app.office365.license.conversion.job.end.migration.gaas.v1.to.v0' = 'end_task'
+        'app.office365.license.conversion.job.end.migration.users.v0.to.v1' = 'end_task'
+        'app.office365.license.conversion.job.end.migration.users.v1.to.v0' = 'end_task'
+        'app.office365.license.conversion.job.migration.gaas.v0.to.v1.failed' = 'start_task'
+        'app.office365.license.conversion.job.migration.gaas.v1.to.v0.failed' = 'start_task'
+        'app.office365.license.conversion.job.migration.users.v0.to.v1.failed' = 'start_task'
+        'app.office365.license.conversion.job.migration.users.v1.to.v0.failed' = 'start_task'
+        'app.office365.license.conversion.job.no.custom.objects.downloaded' = 'download_resource'
+        'app.office365.license.conversion.job.processing.app.instance' = 'unknown'
+        'app.office365.license.conversion.job.skipping.inactive.app.instance' = 'unknown'
+        'app.office365.license.conversion.job.skipping.migration.gaa.v0.to.v1' = 'unknown'
+        'app.office365.license.conversion.job.skipping.migration.gaa.v1.to.v0' = 'unknown'
+        'app.office365.license.conversion.job.skipping.migration.user.v0.to.v1' = 'unknown'
+        'app.office365.license.conversion.job.skipping.migration.user.v1.to.v0' = 'unknown'
+        'app.office365.license.conversion.job.skipping.missing.creds.app.instance' = 'unknown'
+        'app.office365.license.conversion.job.skipping.no.change.licenses.app.instance' = 'unknown'
+        'app.office365.service.principal.cleanup.job.complete' = 'delete_account'
+        'app.office365.service.principal.cleanup.job.invalid.credentials' = 'delete_account'
+        'app.office365.service.principal.cleanup.job.processing' = 'delete_account'
+        'app.office365.service.principal.cleanup.job.skipping.missing.creds' = 'delete_account'
+        'app.office365.service.principal.cleanup.job.skipping.no.service.principal' = 'delete_account'
+        'app.office365.service.principal.cleanup.job.unable.to.delete.service.principal' = 'delete_account'
+        'app.office365.user.delete.success' = 'delete_user'
+        'app.office365.user.lifecycle.action.failed' = 'update_user'
+        'app.office365.user.remove.licenses.success' = 'remove_license'
+      }
+    }
+    if ('raw_event_data.eventType' contains 'job.complete' or 'raw_event_data.eventType' contains 'sync.complete') {
+      set { dest = 'event.outcome', value = 'success'}
+    }
+    if ('raw_event_data.eventType' == 'app.office365.license.conversion.job.no.custom.objects.downloaded') {
+      set { dest = 'event.outcome', value = 'failure'}
+    }
+    if ('raw_event_data.eventType' == 'app.office365.service.principal.cleanup.job.invalid.credentials') {
+      set { dest = 'event.outcome', value = 'failure'}
+    }
+    if ('raw_event_data.eventType' == 'app.office365.service.principal.cleanup.job.skipping.missing.creds') {
+      set { dest = 'event.outcome', value = 'failure'}
+    }
+    if ('raw_event_data.eventType' == 'app.office365.service.principal.cleanup.job.skipping.no.service.principal') {
+      set { dest = 'event.outcome', value = 'failure'}
+    }
+    if ('raw_event_data.eventType' == 'app.office365.service.principal.cleanup.job.unable.to.delete.service.principal') {
+      set { dest = 'event.outcome', value = 'failure'}
+    }
+  }
+  if ('raw_event_data.eventType' starts_with 'app.policy') {
+    translate {
+      src = 'raw_event_data.eventType'
+      dest = 'event.action'
+      map = {
+        'app.policy.sign_on.update' = 'update_policy'
+      }
+    }
+  }
+  if ('raw_event_data.eventType' starts_with 'app.radius') {
+    if ('raw_event_data.eventType' == 'app.radius.agent.listener.failed') {
+      set { dest = 'event.action', value = 'alert_event'}
+    }
+    if ('raw_event_data.eventType' == 'app.radius.agent.listener.succeeded') {
+      set { dest = 'event.action', value = 'complete_workflow'}
+    }
+    if ('raw_event_data.eventType' == 'app.radius.agent.port_inaccessible') {
+      set { dest = 'event.action', value = 'alert_event'}
+    }
+    if ('raw_event_data.eventType' == 'app.radius.agent.port_reaccessible') {
+      set { dest = 'event.action', value = 'alert_event'}
+    }
+    if ('raw_event_data.eventType' == 'app.radius.info_access.no_permission') {
+      set { dest = 'event.action', value = 'access_app'}
+      set { dest = 'event.outcome', value = 'failure'}
+    }
+    if ('raw_event_data.eventType' == 'app.radius.info_access.partial_permission') {
+      set { dest = 'event.action', value = 'access_app'}
+      set { dest = 'event.outcome', value = 'failure'}
+    }
+  }
+  if ('raw_event_data.eventType' starts_with 'app.realtimesync') {
+    set { dest = 'resource.type', value = 'user' }
+    translate {
+      src = 'raw_event_data.eventType'
+      dest = 'event.action'
+      map = {
+        'app.realtimesync.import.details.add_user' = 'add_user'
+        'app.realtimesync.import.details.delete_user' = 'delete_user'
+        'app.realtimesync.import.details.update_user' = 'update_user'
+      }
+    }
+  }
+  if ('raw_event_data.eventType' starts_with 'app.rum') {
+    translate {
+      src = 'raw_event_data.eventType'
+      dest = 'event.action'
+      map = {
+        'app.rum.config.validation.error' = 'unknown'
+        'app.rum.is.api.account.error' = 'unknown'
+        'app.rum.package.thrown.error' = 'unknown'
+        'app.rum.validation.error' = 'unknown'
+      }
+    }
+  }
+  if ('raw_event_data.eventType' starts_with 'app.request_new') {
+    translate {
+      src = 'raw_event_data.eventType'
+      dest = 'event.action'
+      map = {
+        'app.request_new.notify' = 'notify_workflow'
+      }
+    }
+  }
+  if ('raw_event_data.eventType' starts_with 'app.saml') {
+    if ('raw_event_data.eventType' == 'app.saml.sensitive.attribute.update') {
+      set { dest = 'event.action', value = 'update_resource'}
+      set { dest = 'event.outcome', value = 'success'}
+    }
+  }
+  if ('raw_event_data.eventType' starts_with 'app.user_management') {
+    translate {
+      src = 'raw_event_data.eventType'
+      dest = 'event.action'
+      map = {
+        'app.user_management' = 'import_user'
+        'app.user_management.grouppush.mapping.created.from.rule' = 'update_group'
+        'app.user_management.grouppush.mapping.created.from.rule.error.duplicate' = 'update_group'
+        'app.user_management.grouppush.mapping.created.from.rule.error.validation' = 'update_group'
+        'app.user_management.grouppush.mapping.created.from.rule.errors' = 'update_group'
+        'app.user_management.grouppush.mapping.okta.users.ignored' = 'update_group'
+        'app.user_management.import.csv.line.error' = 'unknown'
+        'app.user_management.push_new_user_success' = 'create_user'
+        'app.user_management.update_from_master_failed' = 'import_user'
+        'app.user_management.user_group_import.create_failure' = 'create_group'
+        'app.user_management.user_group_import.delete_success' = 'delete_group'
+        'app.user_management.user_group_import.update_failure' = 'update_group'
+        'app.user_management.user_group_import.upsert_fail' = 'import_group'
+        'app.user_management.user_group_import.upsert_success' = 'import_group'
+      }
+    }
+    if ('raw_event_data.eventType' == 'app.user_management.user_group_import.upsert_fail') {
+      set { dest = 'event.outcome', value = 'failure' }
+    }
+  }
+}
+
+if ('raw_event_data.eventType' starts_with 'application') {
+  if ('raw_event_data.eventType' starts_with 'application.appuser') {
+    if ('raw_event_data.eventType' == 'application.appuser.mapping.invalid.expression') {
+      set { dest = 'event.action', value = 'unknown'}
+    }
+  }
+  if ('raw_event_data.eventType' starts_with 'application.cache') {
+    set { dest = 'resource.type', value = 'application'}
+    if ('raw_event_data.eventType' == 'application.cache.invalidate') {
+      set { dest = 'event.action', value = 'update_resource'}
+    }
+  }
+  if ('raw_event_data.eventType' starts_with 'application.configuration') {
+    translate {
+      src = 'raw_event_data.eventType'
+      dest = 'event.action'
+      map = {
+        'application.configuration.detect_error'= 'unknown'
+        'application.configuration.disable_delauth_outbound'= 'update_authentication'
+        'application.configuration.disable_fed_broker_mode'= 'disable_setting'
+        'application.configuration.enable_delauth_outbound'= 'update_authentication'
+        'application.configuration.enable_fed_broker_mode'= 'enable_setting'
+        'application.configuration.import_schema'= 'import_resource'
+        'application.configuration.read_client_secret' = 'read_password'
+        'application.configuration.reset_logo'= 'update_setting'
+        'application.configuration.update'= 'update_setting'
+        'application.configuration.update_api_credentials_for_pass_change'= 'update_password'
+        'application.configuration.update_logo'= 'update_setting'
+        'application.configuration.update_rate_limits' = 'update_setting'
+      }
+    }
+  }
+  if ('raw_event_data.eventType' starts_with 'application.integration') {
+    translate {
+      src = 'raw_event_data.eventType'
+      dest = 'event.action'
+      map = {
+        'application.integration.api_query' = 'query_api'
+        'application.integration.authentication_failure' = 'authenticate_app'
+        'application.integration.general_failure' = 'unknown'
+        'application.integration.rate_limit_exceeded' = 'alert_api'
+        'application.integration.transfer_files' = 'transfer_owner'
+      }
+    }
+    if ('raw_event_data.eventType' == 'application.integration.transfer_files') {
+      set { dest = 'resource.type', value = 'file' }
+    }
+  }
+  if ('raw_event_data.eventType' starts_with 'application.lifecycle') {
+    translate {
+      src = 'raw_event_data.eventType'
+      dest = 'event.action'
+      map = {
+        'application.lifecycle.activate' = 'enable_app'
+        'application.lifecycle.create' = 'create_app'
+        'application.lifecycle.deactivate' = 'disable_app'
+        'application.lifecycle.delete' = 'delete_app'
+        'application.lifecycle.update' = 'update_app'
+      }
+    }
+  }
+  if ('raw_event_data.eventType' starts_with 'application.policy') {
+    translate {
+      src = 'raw_event_data.eventType'
+      dest = 'event.action'
+      map = {
+        'application.policy.sign_on.deny_access' = 'deny_access'
+        'application.policy.sign_on.rule.create' = 'create_rule'
+        'application.policy.sign_on.rule.delete' = 'delete_rule'
+        'application.policy.sign_on.update' = 'update_rule'
+      }
+    }
+  }
+  if ('raw_event_data.eventType' starts_with 'application.provision') {
+    translate {
+      src = 'raw_event_data.eventType'
+      dest = 'event.action'
+      map = {
+        'application.provision.field_mapping_rule.change' = 'update_rule'
+        'application.provision.group.add' = 'create_group'
+        'application.provision.group.import' = 'import_group'
+        'application.provision.group.remove' = 'delete_group'
+        'application.provision.group.update' = 'update_group'
+        'application.provision.group.verify_exists' = 'verify_group'
+        'application.provision.group_membership.add' = 'add_user'
+        'application.provision.group_membership.import' = 'import_user'
+        'application.provision.group_membership.remove' = 'remove_user'
+        'application.provision.group_membership.update' = 'update_user'
+        'application.provision.group_push.activate_mapping' = 'update_group'
+        'application.provision.group_push.deactivate_mapping' = 'update_group'
+        'application.provision.group_push.delete_appgroup' = 'delete_group'
+        'application.provision.group_push.mapping.and.groups.deleted.rule.deleted' = 'delete_resource'
+        'application.provision.group_push.mapping.app.group.renamed' = 'update_group'
+        'application.provision.group_push.mapping.app.group.renamed.failed' = 'update_group'
+        'application.provision.group_push.mapping.created' = 'create_resource'
+        'application.provision.group_push.mapping.created.from.rule.warning.duplicate.name' = 'create_resource'
+        'application.provision.group_push.mapping.created.from.rule.warning.duplicate.name.tobecreated' = 'create_resource'
+        'application.provision.group_push.mapping.created.from.rule.warning.upsertGroup.duplicate.name' = 'create_resource'
+        'application.provision.group_push.mapping.created.from.rule.warning.upsertgroup.duplicate.name' = 'create_resource'
+        'application.provision.group_push.mapping.deactivated.source.group.renamed' = 'update_resource'
+        'application.provision.group_push.mapping.deactivated.source.group.renamed.failed' = 'update_resource'
+        'application.provision.group_push.mapping.update.or.delete.failed' = 'update_resource'
+        'application.provision.group_push.mapping.update.or.delete.failed.with.error' = 'update_resource'
+        'application.provision.group_push.push_memberships' = 'update_resource'
+        'application.provision.group_push.pushed' = 'create_group'
+        'application.provision.group_push.removed' = 'delete_group'
+        'application.provision.group_push.updated' = 'update_group'
+        'application.provision.integration.call_api' = 'query_api'
+        'application.provision.user.activate' = 'enable_user'
+        'application.provision.user.deactivate' = 'disable_user'
+        'application.provision.user.deprovision' = 'disable_user'
+        'application.provision.user.import' = 'import_user'
+        'application.provision.user.import_profile' = 'import_user'
+        'application.provision.user.password' = 'update_password'
+        'application.provision.user.push' = 'create_user'
+        'application.provision.user.push_okta_password' = 'update_password'
+        'application.provision.user.push_password' = 'update_password'
+        'application.provision.user.push_profile' = 'synchronize_user'
+        'application.provision.user.reactivate' = 'enable_user'
+        'application.provision.user.sync' = 'synchronize_user'
+        'application.provision.user.verify_exists' = 'verify_user'
+      }
+    }
+  }
+  if ('raw_event_data.eventType' starts_with 'application.registration_policy') {
+    set { dest = 'resource.type', value = 'policy' }
+    translate {
+      src = 'raw_event_data.eventType'
+      dest = 'event.action'
+      map = {
+        'application.registration_policy.lifecycle.create' = 'create_policy'
+        'application.registration_policy.lifecycle.update' = 'update_policy'
+      }
+    }
+  }
+  if ('raw_event_data.eventType' starts_with 'application.user_membership') {
+    translate {
+      src = 'raw_event_data.eventType'
+      dest = 'event.action'
+      map = {
+        'application.user_membership.add' = 'add_user'
+        'application.user_membership.approve' = 'approve_user'
+        'application.user_membership.change_password' = 'update_password'
+        'application.user_membership.change_username' = 'update_user'
+        'application.user_membership.deprovision' = 'remove_user'
+        'application.user_membership.provision' = 'add_user'
+        'application.user_membership.remove' = 'remove_user'
+        'application.user_membership.restore' = 'add_user'
+        'application.user_membership.restore_password' = 'reset_password'
+        'application.user_membership.revoke' = 'revoke_user'
+        'application.user_membership.show_password' = 'read_password'
+        'application.user_membership.update' = 'update_user'
+      }
+    }
+  }
+}
+
+if ('raw_event_data.eventType' starts_with 'certification') {
+  set { dest = 'resource.type', value = 'report' }
+  translate {
+    src = 'raw_event_data.eventType'
+    dest = 'event.action'
+    map = {
+      'certification.campaign.close' = 'end_resource'
+      'certification.campaign.context.update' = 'update_resource'
+      'certification.campaign.create' = 'create_resource'
+      'certification.campaign.delete' = 'delete_resource'
+      'certification.campaign.item.decide' = 'update_resource'
+      'certification.campaign.item.remediate' = 'update_resource'
+      'certification.campaign.launch' = 'execute_resource'
+      'certification.campaign.update' = 'update_resource'
+      'certification.remediation.open' = 'read_resource'
+    }
+  }
+}
+
+if ('raw_event_data.eventType' starts_with 'core') {
+  translate {
+    src = 'raw_event_data.eventType'
+    dest = 'event.action'
+    map = {
+      'core.concurrency.org.limit.violation' = 'alert_api'
+      'core.el.evaluate' = 'unknown'
+      'core.user_auth.idp.x509.crl_download_failure' = 'download_resource'
+    }
+  }
+}
+
+if ('raw_event_data.eventType' starts_with 'credential') {
+  set { dest = 'resource.type', value = 'credential' }
+  translate {
+    src = 'raw_event_data.eventType'
+    dest = 'event.action'
+    map = {
+      'credential.register' = 'approve_user'
+      'credential.revoke' = 'revoke_user'
+    }
+  }
+}
+
+if ('raw_event_data.eventType' starts_with 'device') {
+  set { dest = 'resource.type', value = 'device' }
+  translate {
+    src = 'raw_event_data.eventType'
+    dest = 'event.action'
+    map = {
+      'device.assurance.policy.add' = 'add_policy'
+      'device.assurance.policy.delete' = 'delete_policy'
+      'device.assurance.policy.update' = 'update_policy'
+      'device.custom_push.send_notification' = 'notify_workflow'
+      'device.desktop_mfa.configuration.update' = 'change_mfa'
+      'device.desktop_mfa.enrollment.create' = 'enroll_mfa'
+      'device.desktop_mfa.recovery_pin.generate' = 'create_password'
+      'device.desktop_mfa.recovery_pin.rotate_secret' = 'update_password'
+      'device.enrollment.create'= 'add_device'
+      'device.integration.endpoint_security.activate' = 'enable_resource'
+      'device.integration.endpoint_security.deactivate' = 'disable_resource'
+      'device.lifecycle.activate'= 'enable_device'
+      'device.lifecycle.deactivate'= 'disable_device'
+      'device.lifecycle.delete'= 'remove_device'
+      'device.lifecycle.suspend' = 'disable_device'
+      'device.lifecycle.unsuspend' = 'enable_device'
+      'device.local_account.create' = 'create_account'
+      'device.password_sync.authentication' = 'authenticate_user'
+      'device.password_sync.enrollment.create' = 'enroll_mfa'
+      'device.platform.add' = 'add_device'
+      'device.platform.delete' = 'remove_device'
+      'device.platform.renew' = 'update_device'
+      'device.platform.secret_key.reset' = 'update_key'
+      'device.platform.update' = 'update_device'
+      'device.platform_sso.keys.register' = 'create_key'
+      'device.posture.check.add' = 'add_policy'
+      'device.posture.check.delete' = 'delete_policy'
+      'device.posture.check.update' = 'update_policy'
+      'device.push.provider.create' = 'create_resource'
+      'device.push.provider.delete' = 'delete_resource'
+      'device.push.provider.update' = 'update_resource'
+      'device.signals.status.timeout' = 'alert_event'
+      'device.token.enrollment.create' = 'enroll_mfa'
+      'device.user.add'= 'add_device'
+      'device.user.remove'= 'remove_device'
+      'device.user_os_account.sync' = 'synchronize_user'
+    }
+  }
+}
+
+if ('raw_event_data.eventType' starts_with 'directory') {
+  set { dest = 'resource.type', value = 'user' }
+  translate {
+    src = 'raw_event_data.eventType'
+    dest = 'event.action'
+    map = {
+      'directory.app_user_profile.bootstrap' = 'update_user'
+      'directory.app_user_profile.update' = 'update_user'
+      'directory.external.group.membership.add' = 'update_group'
+      'directory.external.group.membership.remove' = 'remove_group'
+      'directory.linked_object.create' = 'create_resource'
+      'directory.linked_object.delete' = 'delete_resource'
+      'directory.mapping.update' = 'update_resource'
+      'directory.non_default_user_profile.create' = 'create_user'
+      'directory.user_profile.bootstrap' = 'update_user'
+      'directory.user_profile.update' = 'update_user'
+    }
+  }
+}
+
+if ('raw_event_data.eventType' starts_with 'event_hook') {
+  set { dest = 'resource.type', value = 'destination' }
+  translate {
+    src = 'raw_event_data.eventType'
+    dest = 'event.action'
+    map = {
+      'event_hook.activated' = 'enable_webhook'
+      'event_hook.created' = 'create_webhook'
+      'event_hook.deactivated' = 'disable_webhook'
+      'event_hook.deleted' = 'delete_webhook'
+      'event_hook.delivery' = 'access_webhook'
+      'event_hook.updated' = 'update_webhook'
+      'event_hook.verified' = 'verify_webhook'
+    }
+  }
+}
+
+if ('raw_event_data.eventType' starts_with 'group') {
+  translate {
+    src = 'raw_event_data.eventType'
+    dest = 'event.action'
+    map = {
+      'group.application_assignment.add' = 'add_app'
+      'group.application_assignment.remove' = 'remove_app'
+      'group.application_assignment.skip_assignment_reconcile' = 'unknown'
+      'group.application_assignment.update' = 'update_app'
+      'group.lifecycle.create' = 'create_group'
+      'group.lifecycle.delete' = 'delete_group'
+      'group.privilege.grant' = 'add_permission'
+      'group.privilege.revoke' = 'remove_permission'
+      'group.profile.update' = 'update_group'
+      'group.user_membership.add' = 'add_user'
+      'group.user_membership.remove' = 'remove_user'
+      'group.user_membership.rule.add_exclusion' = 'add_user'
+      'group.user_membership.rule.deactivated' = 'disable_user'
+      'group.user_membership.rule.error' = 'unknown'
+      'group.user_membership.rule.evaluation' = 'read_rule'
+      'group.user_membership.rule.invalidate' = 'disable_rule'
+      'group.user_membership.rule.trigger' = 'execute_rule'
+    }
+  }
+}
+
+if ('raw_event_data.eventType' starts_with 'iam') {
+  translate {
+    src = 'raw_event_data.eventType'
+    dest = 'event.action'
+    map = {
+      'iam.policy.configuration.update' = 'update_policy'
+      'iam.resourceset.bindings.add' = 'create_role'
+      'iam.resourceset.bindings.delete' = 'delete_role'
+      'iam.resourceset.create' = 'create_resource'
+      'iam.resourceset.delete' = 'delete_resource'
+      'iam.resourceset.resources.add' = 'add_resource'
+      'iam.resourceset.resources.delete' = 'delete_resource'
+      'iam.resourceset.resources.update' = 'update_resource'
+      'iam.role.create' = 'create_role'
+      'iam.role.delete' = 'delete_role'
+      'iam.role.update' = 'update_role'
+      'iam.role.permission.conditions.add' = 'update_permission'
+      'iam.role.permission.conditions.delete' = 'update_permission'
+      'iam.role.permissions.add' = 'add_permission'
+      'iam.role.permissions.delete' = 'delete_permission'
+    }
+  }
+}
+
+if ('raw_event_data.eventType' starts_with 'inline_hook') {
+  set { dest = 'resource.type', value = 'destination' }
+  translate {
+    src = 'raw_event_data.eventType'
+    dest = 'event.action'
+    map = {
+      'inline_hook.activated' = 'enable_webhook'
+      'inline_hook.created' = 'create_webhook'
+      'inline_hook.deactivated' = 'disable_webhook'
+      'inline_hook.deleted' = 'delete_webhook'
+      'inline_hook.executed' = 'access_webhook'
+      'inline_hook.response.processed' = 'access_webhook'
+      'inline_hook.updated' = 'update_webhook'
+      'inline_hook.verified' = 'verify_webhook'
+    }
+  }
+}
+if ('raw_event_data.eventType' starts_with 'integration') {
+  translate {
+    src = 'raw_event_data.eventType'
+    dest = 'event.action'
+    map = {
+      'integration.api_service.lifecycle.authorize' = 'approve_access'
+      'integration.api_service.lifecycle.revoke' = 'revoke_access'
+    }
+  }
+}
+
+if ('raw_event_data.eventType' starts_with 'master_application') {
+  if ('raw_event_data.eventType' == 'master_application.user_membership.add') {
+    set { dest = 'event.action', value = 'add_user'}
+  }
+}
+
+if ('raw_event_data.eventType' starts_with 'mim') {
+  translate {
+    src = 'raw_event_data.eventType'
+    dest = 'event.action'
+    map = {
+      'mim.createenrollment.android' = 'enroll_mfa'
+      'mim.createenrollment.ios' = 'enroll_mfa'
+      'mim.createenrollment.osx' = 'enroll_mfa'
+      'mim.createenrollment.unknown' = 'enroll_mfa'
+      'mim.createenrollment.windows' = 'enroll_mfa'
+      'mim.command.generic.acknowledged' = 'unknown'
+      'mim.command.generic.cancelled' = 'unknown'
+      'mim.command.generic.delegated' = 'unknown'
+      'mim.command.generic.error' = 'unknown'
+      'mim.command.generic.new' = 'unknown'
+      'mim.command.generic.notnow' = 'unknown'
+      'mim.command.ios.acknowledged' = 'unknown'
+      'mim.command.ios.cancelled' = 'unknown'
+      'mim.command.ios.error' = 'unknown'
+      'mim.command.ios.formaterror' = 'unknown'
+      'mim.command.ios.new' = 'unknown'
+      'mim.createEnrollment.ANDROID' = 'add_device'
+      'mim.createEnrollment.IOS' = 'add_device'
+      'mim.createEnrollment.OSX' = 'add_device'
+      'mim.createEnrollment.UNKNOWN' = 'add_device'
+      'mim.createEnrollment.WINDOWS' = 'add_device'
+      'mim.streamDevicesAppListCSVDownload' = 'download_resource'
+      'mim.streamDevicesCSVDownload' = 'download_resource'
+    }
+  }
+}
+
+if ('raw_event_data.eventType' starts_with 'network_zone') {
+  if ('raw_event_data.eventType' == 'network_zone.rule.disabled') {
+    set { dest = 'event.action', value = 'disable_rule'}
+  }
+}
+
+if ('raw_event_data.eventType' starts_with 'oauth2') {
+  translate {
+    src = 'raw_event_data.eventType'
+    dest = 'event.action'
+    map = {
+      'oauth2.as.activated' = 'enable_resource'
+      'oauth2.as.created' = 'create_resource'
+      'oauth2.as.deactivated' = 'disable_resource'
+      'oauth2.as.deleted' = 'delete_resource'
+      'oauth2.as.updated' = 'update_resource'
+      'oauth2.claim.created' = 'create_resource'
+      'oauth2.claim.deleted' = 'delete_resource'
+      'oauth2.claim.updated' = 'update_resource'
+      'oauth2.scope.created' = 'create_resource'
+      'oauth2.scope.deleted' = 'delete_resource'
+      'oauth2.scope.updated' = 'update_resource'
+    }
+  }
+}
+
+if ('raw_event_data.eventType' starts_with 'omm') {
+  translate {
+    src = 'raw_event_data.eventType'
+    dest = 'event.action'
+    map = {
+      'omm.app.VPN.settings.changed' = 'update_setting'
+      'omm.app.WIFI.settings.changed' = 'update_setting'
+      'omm.app.eas.cert_based.settings.changed' = 'update_setting'
+      'omm.app.eas.disabled' = 'update_setting'
+      'omm.app.eas.settings.changed' = 'update_setting'
+      'omm.cma.created' = 'create_resource'
+      'omm.cma.deleted' = 'delete_resource'
+      'omm.cma.updated' = 'update_resource'
+      'omm.enrollment.changed' = 'update_resource'
+    }
+  }
+}
+
+if ('raw_event_data.eventType' starts_with 'org') {
+  if ('raw_event_data.eventType' == 'org.not_configured_origin.redirection.usage') {
+    set { dest = 'event.action', value = 'unknown'}
+  }
+}
+if ('raw_event_data.eventType' starts_with 'pam') {
+  translate {
+    src = 'raw_event_data.eventType'
+    dest = 'event.action'
+    map = {
+      'pam.ad_connection.create' = 'create_account'
+      'pam.ad_connection.delete' = 'delete_resource'
+      'pam.ad_connection.update' = 'update_resource'
+      'pam.ad_task_settings.create' = 'create_setting'
+      'pam.ad_task_settings.delete' = 'delete_setting'
+      'pam.ad_task_settings.update' = 'update_setting'
+      'pam.ad_task_settings.update_schedule' = 'update_setting'
+      'pam.ad_user_sync_task_settings.activate' = 'enable_resource'
+      'pam.ad_user_sync_task_settings.create' = 'create_setting'
+      'pam.ad_user_sync_task_settings.deactivate' = 'disable_resource'
+      'pam.ad_user_sync_task_settings.delete' = 'delete_setting'
+      'pam.ad_user_sync_task_settings.update' = 'update_setting'
+      'pam.ad_user_sync_task_settings.update_schedule' = 'update_setting'
+      'pam.apikey.delete' = 'delete_token'
+      'pam.apikey.rotate' = 'update_token'
+      'pam.auth_token.issue' = 'create_token'
+      'pam.billing_contact.create' = 'create_account'
+      'pam.client.assign' = 'assign_issue'
+      'pam.client.enroll' = 'enroll_mfa'
+      'pam.client.remove' = 'remove_user'
+      'pam.client.state.update' = 'update_status'
+      'pam.client_enrollment_policies.create' = 'create_policy'
+      'pam.client_enrollment_policies.delete' = 'delete_policy'
+      'pam.client_enrollment_policies.update' = 'update_policy'
+      'pam.client_enrollment_policy_token.delete' = 'delete_token'
+      'pam.client_enrollment_policy_token.rotate' = 'update_token'
+      'pam.cloud_account.create' = 'create_account'
+      'pam.cloud_account.delete' = 'delete_account'
+      'pam.cloud_account.update' = 'update_account'
+      'pam.entitlement_sudo.add_to_project' = 'add_permission'
+      'pam.entitlement_sudo.create' = 'create_permission'
+      'pam.entitlement_sudo.remove' = 'remove_permission'
+      'pam.entitlement_sudo.remove_from_project' = 'remove_permission'
+      'pam.entitlement_sudo.update' = 'update_permission'
+      'pam.gateway.create' = 'create_resource'
+      'pam.gateway.delete' = 'delete_resource'
+      'pam.gateway.setup_token.create' = 'create_token'
+      'pam.gateway.setup_token.delete' = 'delete_token'
+      'pam.gateway.setup_token.update' = 'update_token'
+      'pam.gateway.update' = 'update_resource'
+      'pam.gateway_creds.issue' = 'create_token'
+      'pam.group.bulk_membership_change' = 'update_group'
+      'pam.group.create' = 'create_group'
+      'pam.group.delete' = 'delete_group'
+      'pam.incoming_federation.approve' = 'approve_access'
+      'pam.incoming_federation.request' = 'request_access'
+      'pam.member.add' = 'add_user'
+      'pam.member.remove' = 'remove_user'
+      'pam.offline_disabled_event' = 'disable_user'
+      'pam.offline_enabled_event' = 'enable_user'
+      'pam.offline_group.secrets.rotate' = 'update_token'
+      'pam.outgoing_federation.approve' = 'approve_access'
+      'pam.password.change' = 'update_password'
+      'pam.password.reset' = 'reset_password'
+      'pam.permission.change' = 'update_permission'
+      'pam.preauthorization.create' = 'create_request'
+      'pam.preauthorization.update' = 'update_request'
+      'pam.project.add_group' = 'update_group'
+      'pam.project.create' = 'create_project'
+      'pam.project.delete' = 'delete_project'
+      'pam.project.remove_group' = 'remove_group'
+      'pam.project.update' = 'update_project'
+      'pam.project_group_selector.update' = 'update_group'
+      'pam.resource.checkin.end' = 'end_resource'
+      'pam.resource.checkin.start' = 'start_resource'
+      'pam.resource.checkout' = 'update_resource'
+      'pam.resource_group.create' = 'create_group'
+      'pam.resource_group.delete' = 'delete_group'
+      'pam.resource_group.update' = 'update_group'
+      'pam.secret.create' = 'create_key'
+      'pam.secret.delete' = 'delete_key'
+      'pam.secret.reveal' = 'read_password'
+      'pam.secret.update' = 'update_key'
+      'pam.secret_folder.create' = 'create_resource'
+      'pam.secret_folder.delete' = 'delete_resource'
+      'pam.secret_folder.update' = 'update_resource'
+      'pam.security_policy.create' = 'create_policy'
+      'pam.security_policy.delete' = 'delete_policy'
+      'pam.security_policy.evaluate' = 'evaluate_policy'
+      'pam.security_policy.update' = 'update_policy'
+      'pam.server.enroll' = 'enroll_mfa'
+      'pam.server.reassign' = 'update_resource'
+      'pam.server.remove' = 'remove_resource'
+      'pam.server.ssh_login' = 'authenticate_user'
+      'pam.server_account.discovered' = 'alert_event'
+      'pam.server_account.password_change.initiated' = 'update_password'
+      'pam.server_account.password_change.out_of_band' = 'update_password'
+      'pam.server_account.password_change.update' = 'update_password'
+      'pam.server_account.update' = 'update_account'
+      'pam.server_labels.update' = 'update_resource'
+      'pam.service.create' = 'create_resource'
+      'pam.service.remove' = 'remove_resource'
+      'pam.service_account.assign' = 'assign_issue'
+      'pam.service_account.create' = 'create_account'
+      'pam.service_account.delete' = 'delete_account'
+      'pam.service_account.password.reveal' = 'read_password'
+      'pam.service_account.password.update' = 'update_password'
+      'pam.service_account.password_rotation.end' = 'end_resource'
+      'pam.service_account.password_rotation.start' = 'execute_workflow'
+      'pam.service_account.update' = 'update_account'
+      'pam.sudo_command_bundle.create' = 'create_resource'
+      'pam.sudo_command_bundle.delete' = 'delete_resource'
+      'pam.sudo_command_bundle.update' = 'update_resource'
+      'pam.team.create' = 'create_team'
+      'pam.team_group_attribute.create' = 'create_resource'
+      'pam.team_group_attribute.delete' = 'delete_resource'
+      'pam.team_group_attribute.update' = 'update_resource'
+      'pam.team_invitation.create' = 'invite_user'
+      'pam.team_project_group_attribute.create' = 'create_resource'
+      'pam.team_project_group_attribute.delete' = 'delete_resource'
+      'pam.team_project_group_attribute.update' = 'update_resource'
+      'pam.team_project_user_attribute.create' = 'create_resource'
+      'pam.team_project_user_attribute.delete' = 'delete_resource'
+      'pam.team_project_user_attribute.update' = 'update_resource'
+      'pam.team_settings.update' = 'update_setting'
+      'pam.team_user_attribute.create' = 'create_resource'
+      'pam.team_user_attribute.delete' = 'delete_resource'
+      'pam.team_user_attribute.update' = 'update_resource'
+      'pam.unbound_client.enroll' = 'enroll_mfa'
+      'pam.unmanaged_server.create' = 'create_resource'
+      'pam.user.create' = 'create_user'
+      'pam.user.remove' = 'remove_user'
+      'pam.user.update' = 'update_user'
+      'pam.user_creds.issue' = 'create_token'
+    }
+  }
+}
+
+if ('raw_event_data.eventType' starts_with 'personal') {
+  translate {
+    src = 'raw_event_data.eventType'
+    dest = 'event.action'
+    map = {
+      'personal.admin.configuration.update' = 'update_setting'
+      'personal.user.app_migration.export' = 'download_resource'
+    }
+  }
+}
+
+if ('raw_event_data.eventType' starts_with 'pki') {
+  translate {
+    src = 'raw_event_data.eventType'
+    dest = 'event.action'
+    map = {
+      'pki.ca.add' = 'add_resource'
+      'pki.ca.delete' = 'delete_resource'
+      'pki.ca.renew' = 'update_resource'
+      'pki.cert.bind' = 'update_resource'
+      'pki.cert.crl_download_failure' = 'download_resource'
+      'pki.cert.issue' = 'issue_certificate'
+      'pki.cert.lifecycle.activate' = 'enable_resource'
+      'pki.cert.lifecycle.delete' = 'delete_resource'
+      'pki.cert.lifecycle.hold' = 'update_resource'
+      'pki.cert.lifecycle.revoke' = 'revoke_access'
+      'pki.cert.lifecycle.suspend' = 'disable_user'
+      'pki.cert.renew' = 'update_certificate'
+      'pki.cert.revoke' = 'revoke_certificate'
+    }
+  }
+}
+
+if ('raw_event_data.eventType' starts_with 'plugin') {
+  translate {
+    src = 'raw_event_data.eventType'
+    dest = 'event.action'
+    map = {
+      'plugin.downloaded' = 'download_resource'
+      'plugin.script_status' = 'update_status'
+    }
+  }
+}
+
+if ('raw_event_data.eventType' starts_with 'policy') {
+  if ('raw_event_data.eventType' starts_with 'policy.auth') {
+      translate {
+      src = 'raw_event_data.eventType'
+      dest = 'event.action'
+      map = {
+        'policy.auth_reevaluate.action' = 'evaluate_policy'
+        'policy.auth_reevaluate.enforce' = 'enable_policy'
+        'policy.auth_reevaluate.fail' = 'alert_event'
+      }
+    }
+  }
+  if ('raw_event_data.eventType' starts_with 'policy.continuous') {
+      translate {
+      src = 'raw_event_data.eventType'
+      dest = 'event.action'
+      map = {
+        'policy.continuous_access.action' = 'alert_event'
+        'policy.continuous_access.evaluate' = 'evaluate_policy'
+      }
+    }
+  }
+  if ('raw_event_data.eventType' starts_with 'policy.entity') {
+      translate {
+      src = 'raw_event_data.eventType'
+      dest = 'event.action'
+      map = {
+        'policy.entity_risk.action' = 'alert_event'
+        'policy.entity_risk.evaluate' = 'evaluate_policy'
+      }
+    }
+  }
+  if ('raw_event_data.eventType' starts_with 'policy.evaluate_sign_on') {
+    if ('raw_event_data.eventType' == 'policy.evaluate_sign_on') {
+      set { dest = 'event.action', value = 'evaluate_policy'}
+    }
+  }
+  if ('raw_event_data.eventType' starts_with 'policy.execute') {
+    if ('raw_event_data.eventType' == 'policy.execute.user.start') {
+      set { dest = 'event.action', value = 'add_policy'}
+    }
+  }
+  if ('raw_event_data.eventType' starts_with 'policy.lifecycle') {
+    set { dest = 'resource.type', value = 'policy' }
+    translate {
+      src = 'raw_event_data.eventType'
+      dest = 'event.action'
+      map = {
+        'policy.lifecycle.activate' = 'enable_policy'
+        'policy.lifecycle.create' = 'create_policy'
+        'policy.lifecycle.deactivate' = 'disable_policy'
+        'policy.lifecycle.delete' = 'delete_policy'
+        'policy.lifecycle.overwrite' = 'update_policy'
+        'policy.lifecycle.update' = 'update_policy'
+      }
+    }
+  }
+  if ('raw_event_data.eventType' starts_with 'policy.mapping') {
+    if ('raw_event_data.eventType' == 'policy.mapping.create') {
+      set { dest = 'event.action', value = 'create_policy'}
+    }
+  }
+  if ('raw_event_data.eventType' starts_with 'policy.rule') {
+    set { dest = 'resource.type', value = 'rule' }
+    translate {
+      src = 'raw_event_data.eventType'
+      dest = 'event.action'
+      map = {
+        'policy.rule.action.execute' = 'execute_rule'
+        'policy.rule.activate' = 'enable_rule'
+        'policy.rule.add' = 'add_rule'
+        'policy.rule.deactivate' = 'disable_rule'
+        'policy.rule.delete' = 'delete_rule'
+        'policy.rule.invalidate' = 'disable_rule'
+        'policy.rule.update' = 'update_rule'
+      }
+    }
+  }
+  if ('raw_event_data.eventType' starts_with 'policy.scheduled') {
+    if ('raw_event_data.eventType' == 'policy.scheduled.execute') {
+      set { dest = 'event.action', value = 'execute_policy'}
+    }
+  }
+}
+
+if ('raw_event_data.eventType' starts_with 'scheduled_action') {
+  translate {
+    src = 'raw_event_data.eventType'
+    dest = 'event.action'
+    map = {
+      'scheduled_action.user_suspension.canceled' = 'delete_task'
+      'scheduled_action.user_suspension.completed' = 'complete_task'
+      'scheduled_action.user_suspension.scheduled' = 'create_task'
+      'scheduled_action.user_suspension.updated' = 'update_task'
+    }
+  }
+}
+
+if ('raw_event_data.eventType' starts_with 'security') {
+  translate {
+    src = 'raw_event_data.eventType'
+    dest = 'event.action'
+    map = {
+      'security.attack.end' = 'end_resource'
+      'security.attack.start' = 'execute_workflow'
+      'security.attack_protection.settings.update' = 'update_setting'
+      'security.authenticator.lifecycle.activate' = 'enable_app'
+      'security.authenticator.lifecycle.create' = 'create_app'
+      'security.authenticator.lifecycle.deactivate' = 'disable_app'
+      'security.authenticator.lifecycle.update' = 'update_app'
+      'security.behavior.settings.create' = 'create_setting'
+      'security.behavior.settings.delete' = 'delete_setting'
+      'security.behavior.settings.update' = 'update_setting'
+      'security.breached_credential.detected' = 'alert_event'
+      'security.device.add_request_blacklist_policy' = 'add_policy'
+      'security.device.remove_request_blacklist_policy' = 'remove_policy'
+      'security.device.temporarily_disable_blacklisting' = 'disable_policy'
+      'security.events.provider.activate' = 'enable_resource'
+      'security.events.provider.create' = 'create_resource'
+      'security.events.provider.deactivate' = 'disable_resource'
+      'security.events.provider.delete' = 'delete_resource'
+      'security.events.provider.receive_event' = 'alert_event'
+      'security.events.provider.update' = 'update_resource'
+      'security.events.transmitter.create' = 'create_resource'
+      'security.events.transmitter.delete' = 'delete_resource'
+      'security.events.transmitter.update' = 'update_resource'
+      'security.request.blocked' = 'deny_request'
+      'security.session.detect_client_roaming' = 'unknown'
+      'security.threat.configuration.update' = 'update_setting'
+      'security.threat.detected' = 'alert_resource'
+      'security.trusted_origin.activate' = 'enable_resource'
+      'security.trusted_origin.create' = 'create_resource'
+      'security.trusted_origin.deactivate' = 'disable_resource'
+      'security.trusted_origin.delete' = 'delete_resource'
+      'security.trusted_origin.update' = 'update_resource'
+      'support.org.update' = 'update_resource'
+      'support.org.view' = 'read_resource'
+      'security.voice.add_country_blacklist' = 'add_rule'
+      'security.voice.remove_country_blacklist' = 'remove_rule'
+      'security.zone.make_blacklist' = 'create_rule'
+      'security.zone.remove_blacklist' = 'remove_rule'
+      'security.session.detect_client_roaming' = 'alert_user'
+    }
+  }
+}
+
+if ('raw_event_data.eventType' starts_with 'self_service') {
+  translate {
+    src = 'raw_event_data.eventType'
+    dest = 'event.action'
+    map = {
+      'self_service.disabled' = 'disable_resource'
+      'self_service.enabled' = 'enable_resource'
+    }
+  }
+}
+
+if ('raw_event_data.eventType' starts_with 'system') {
+  if ('raw_event_data.eventType' starts_with 'system.agent') {
+    translate {
+      src = 'raw_event_data.eventType'
+      dest = 'event.action'
+      map = {
+        'system.agent.ad.connect' = 'connect_app'
+        'system.agent.ad.config_change_detected' = 'update_resource'
+        'system.agent.ad.create' = 'create_app'
+        'system.agent.ad.deactivate' = 'disable_app'
+        'system.agent.ad.delete' = 'delete_app'
+        'system.agent.ad.import_ou' = 'import_resource'
+        'system.agent.ad.import_user' = 'import_user'
+        'system.agent.ad.invoke_dir' = 'execute_command'
+        'system.agent.ad.reactivate' = 'enable_app'
+        'system.agent.ad.read_config' = 'read_config'
+        'system.agent.ad.read_dirsync' = 'read_resource'
+        'system.agent.ad.read_ldap' = 'read_resource'
+        'system.agent.ad.read_schema' = 'read_schema'
+        'system.agent.ad.read_topology' = 'read_resource'
+        'system.agent.ad.realtimesync' = 'synchronize_user'
+        'system.agent.ad.reset_user_password' = 'update_password'
+        'system.agent.ad.start' = 'execute_app'
+        'system.agent.ad.unlock_user_account' = 'unlock_user'
+        'system.agent.ad.update' = 'update_app'
+        'system.agent.ad.update_user' = 'update_user'
+        'system.agent.ad.upgrade' = 'upgrade_app'
+        'system.agent.ad.upload_iwa_log' = 'upload_resource'
+        'system.agent.ad.upload_log' = 'upload_resource'
+        'system.agent.ad.write_ldap' = 'update_resource'
+        'system.agent.auto_update' = 'update_resource'
+        'system.agent.connector.connect' = 'connect_app'
+        'system.agent.connector.deactivate' = 'disable_app'
+        'system.agent.connector.delete' = 'delete_app'
+        'system.agent.connector.reactivate' = 'enable_app'
+        'system.agent.ldap.change_user_password' = 'update_password'
+        'system.agent.ldap.create_user_JIT' = 'create_user'
+        'system.agent.ldap.disconnect' = 'disconnect_app'
+        'system.agent.ldap.realtimesync' = 'synchronize_user'
+        'system.agent.ldap.reconnect' = 'connect_app'
+        'system.agent.ldap.reset_user_password' = 'update_password'
+        'system.agent.ldap.unlock_user_account' = 'unlock_user'
+        'system.agent.ldap.update_user' = 'update_user'
+        'system.agent.ldap.update_user_password' = 'update_password'
+        'system.agent.register' = 'authenticate_app'
+        'system.agent_pools.auto_update' = 'update_resource'
+        'system.api_token.update' = 'update_token'
+        'system.beta.feature.enable' = 'enable_app'
+        'system.brand.create' = 'create_resource'
+        'system.brand.delete' = 'delete_resource'
+        'system.brand.update' = 'update_resource'
+        'system.captcha.create' = 'create_setting'
+        'system.captcha.delete' = 'delete_setting'
+        'system.captcha.update' = 'update_setting'
+        'system.client.concurrency_rate_limit.notification' = 'alert_event'
+        'system.client.rate_limit.notification' = 'alert_event'
+        'system.custom_error.delete' = 'delete_resource'
+        'system.custom_error.update' = 'update_resource'
+        'system.custom_signin.delete' = 'delete_resource'
+        'system.custom_signin.update' = 'update_resource'
+        'system.custom_signout.update' = 'update_resource'
+        'system.custom_url_domain.cert_renew' = 'update_resource'
+        'system.custom_url_domain.cert_upload' = 'upload_resource'
+        'system.custom_url_domain.delete' = 'delete_resource'
+        'system.custom_url_domain.initiate' = 'alert_event'
+        'system.custom_url_domain.update' = 'update_resource'
+        'system.custom_url_domain.verify' = 'verify_resource'
+        'system.dr.failback' = 'alert_event'
+        'system.dr.failover' = 'alert_event'
+        'system.email.bounce.removal' = 'alert_event'
+        'system.email.template.create' = 'create_resource'
+        'system.email.template.delete' = 'delete_resource'
+        'system.email.template.settings_changed' = 'update_setting'
+        'system.email_domain.create' = 'create_resource'
+        'system.email_domain.delete' = 'delete_resource'
+        'system.email_domain.update' = 'update_resource'
+        'system.email_domain.verify' = 'verify_resource'
+        'system.feature.disable' = 'disable_app'
+        'system.feature.enable' = 'enable_app'
+        'system.hook.key.created' = 'create_key'
+        'system.hook.key.deleted' = 'delete_key'
+        'system.hook.key.updated' = 'update_key'
+        'system.identity_sources.bulk_delete' = 'delete_resource'
+        'system.identity_sources.bulk_upsert' = 'update_resource'
+        'system.idp.key.create' = 'create_key'
+        'system.idp.key.delete' = 'delete_key'
+        'system.idp.key.update' = 'update_key'
+        'system.idp.lifecycle.activate' = 'enable_resource'
+        'system.idp.lifecycle.read_client_secret' = 'read_password'
+        'system.idp.lifecycle.update' = 'update_resource'
+        'system.import.entitlement.mismatch' = 'alert_event'
+        'system.import.schedule' = 'alert_event'
+        'system.import.session.cancelled' = 'close_request'
+        'system.import.session.created' = 'create_resource'
+        'system.import.session.expired' = 'expire_request'
+        'system.import.session.triggered' = 'alert_event'
+        'system.import.user_match.confirm' = 'alert_event'
+        'system.import.user_match.unignore' = 'alert_event'
+        'system.import.user_match.update' = 'update_user'
+        'system.iwa_agentless.auth_after_redirect' = 'authenticate_app'
+        'system.ldapi.admin_limit_exceeded' = 'alert_event'
+        'system.log_stream.lifecycle.activate' = 'enable_resource'
+        'system.log_stream.lifecycle.create' = 'create_resource'
+        'system.log_stream.lifecycle.deactivate' = 'disable_resource'
+        'system.log_stream.lifecycle.delete' = 'delete_resource'
+        'system.log_stream.lifecycle.update' = 'update_resource'
+        'system.operation.concurrency_limit.violation' = 'alert_event'
+        'system.operation.rate_limit.violation' = 'alert_event'
+        'system.operation.rate_limit.warning' = 'alert_event'
+        'system.org.captcha.activate' = 'enable_resource'
+        'system.org.captcha.deactivate' = 'disable_resource'
+        'system.org.rate_limit.burst' = 'alert_event'
+        'system.self_service.configuration.update' = 'update_setting'
+        'system.theme.update' = 'update_setting'
+      }
+    }
+    if ('raw_event_data.eventType' contains 'system.agent.ad') {
+      set { dest = 'resource.type', value = 'application' }
+      set { dest = 'application.name', value = 'AD agent' }
+    }
+    if ('raw_event_data.eventType' contains 'system.agent.ldap') {
+      set { dest = 'resource.type', value = 'application' }
+      set { dest = 'application.name', value = 'LDAP agent' }
+    }
+    if ('raw_event_data.eventType' == 'system.agent.connector.connect') {
+      set { dest = 'resource.type', value = 'application' }
+    }
+  }
+  if ('raw_event_data.eventType' starts_with 'system.api_token') {
+    translate {
+      src = 'raw_event_data.eventType'
+      dest = 'event.action'
+      map = {
+        'system.api_token.create' = 'create_token'
+        'system.api_token.enable' = 'approve_token'
+        'system.api_token.revoke' = 'revoke_token'
+      }
+    }
+  }
+  if ('raw_event_data.eventType' starts_with 'system.billing') {
+    if ('raw_event_data.eventType' == 'system.billing.sms_usage_sent') {
+      set { dest = 'event.action', value = 'synchronize_resource'}
+      set { dest = 'resource.type', value = 'report'}
+    }
+  }
+  if ('raw_event_data.eventType' starts_with 'system.client') {
+    if ('raw_event_data.eventType' == 'system.client.concurrency_rate_limit.violation') {
+      set { dest = 'event.action', value = 'alert_api'}
+    }
+    if ('raw_event_data.eventType' == 'system.client.rate_limit.violation') {
+      set { dest = 'event.action', value = 'alert_api'}
+    }
+  }
+  if ('raw_event_data.eventType' starts_with 'system.csv') {
+    if ('raw_event_data.eventType' == 'system.csv.import_user') {
+      set { dest = 'event.action', value = 'import_user'}
+    }
+  }
+  if ('raw_event_data.eventType' starts_with 'system.directory') {
+    translate {
+      src = 'raw_event_data.eventType'
+      dest = 'event.action'
+      map = {
+        'system.directory.debugger.extend' = 'execute_app'
+        'system.directory.debugger.grant' = 'approve_app'
+        'system.directory.debugger.query_executed' = 'execute_app'
+        'system.directory.debugger.revoke' = 'revoke_app'
+      }
+    }
+  }
+  if ('raw_event_data.eventType' starts_with 'system.email') {
+    translate {
+      src = 'raw_event_data.eventType'
+      dest = 'event.action'
+      map = {
+        'system.email.account_unlock.sent_message' = 'notify_mfa'
+        'system.email.challenge_factor_redeemed' = 'notify_issue'
+        'system.email.delivery' = 'notify_issue'
+        'system.email.mfa_enroll_notification.sent_message' = 'notify_mfa'
+        'system.email.mfa_reset_notification.sent_message' = 'notify_mfa'
+        'system.email.new_device_notification.sent_message' = 'notify_mfa'
+        'system.email.password_reset.sent_message' = 'notify_mfa'
+        'system.email.send_factor_verify_message' = 'notify_mfa'
+        'system.email.template.update' = 'notify_issue'
+      }
+    }
+  }
+  if ('raw_event_data.eventType' starts_with 'system.feature') {
+    if ('raw_event_data.eventType' == 'system.feature.ea_auto_enroll') {
+      set { dest = 'event.action', value = 'update_organization'}
+    }
+  }
+  if ('raw_event_data.eventType' starts_with 'system.idp') {
+    set { dest = 'resource.type', value = 'application' }
+    translate {
+      src = 'raw_event_data.eventType'
+      dest = 'event.action'
+      map = {
+        'system.idp.lifecycle.create' = 'create_resource'
+        'system.idp.lifecycle.deactivate' = 'disable_resource'
+        'system.idp.lifecycle.delete' = 'delete_resource'
+      }
+    }
+  }
+  if ('raw_event_data.eventType' starts_with 'system.import') {
+    translate {
+      src = 'raw_event_data.eventType'
+      dest = 'event.action'
+      map = {
+        'system.import.clear.unconfirmed.users.summary' = 'remove_resource'
+        'system.import.complete' = 'import_resource'
+        'system.import.complete_batch' = 'import_resource'
+        'system.import.custom_object.complete' = 'import_resource'
+        'system.import.custom_object.create' = 'create_resource'
+        'system.import.custom_object.delete' = 'delete_resource'
+        'system.import.custom_object.update' = 'update_resource'
+        'system.import.download.complete' = 'import_resource'
+        'system.import.download.start' = 'import_resource'
+        'system.import.group.complete' = 'import_group'
+        'system.import.group.create' = 'create_group'
+        'system.import.group.delete' = 'delete_group'
+        'system.import.group.start' = 'import_resource'
+        'system.import.group.update' = 'update_group'
+        'system.import.group_membership.complete' = 'import_resource'
+        'system.import.implicit_deletion.complete' = 'delete_resource'
+        'system.import.implicit_deletion.start' = 'delete_resource'
+        'system.import.import_profile' = 'import_user'
+        'system.import.import_provisioning_info' = 'import_resource'
+        'system.import.membership_processing.complete' = 'import_resource'
+        'system.import.membership_processing.start' = 'import_resource'
+        'system.import.object_creation.complete' = 'create_resource'
+        'system.import.object_creation.start' = 'create_resource'
+        'system.import.roadblock' = 'import_resource'
+        'system.import.roadblock.reschedule_and_resume' = 'import_resource'
+        'system.import.roadblock.resume' = 'import_resource'
+        'system.import.roadblock.updated' = 'update_resource'
+        'system.import.start' = 'import_resource'
+        'system.import.user.complete' = 'import_user'
+        'system.import.user.create' = 'create_user'
+        'system.import.user.delete' = 'delete_user'
+        'system.import.user.match' = 'unknown'
+        'system.import.user.start' = 'import_user'
+        'system.import.user.suspend' = 'disable_user'
+        'system.import.user.unsuspend' = 'enable_user'
+        'system.import.user.unsuspend_after_confirm' = 'enable_user'
+        'system.import.user.update' = 'update_user'
+        'system.import.user.update_user_lifecycle_from_master' = 'update_user'
+        'system.import.user_csv.complete' = 'import_user'
+        'system.import.user_csv.start' = 'import_user'
+        'system.import.user_matching.complete' = 'verify_user'
+        'system.import.user_matching.start' = 'verify_user'
+      }
+    }
+  }
+  if ('raw_event_data.eventType' starts_with 'system.iwa') {
+    translate {
+      src = 'raw_event_data.eventType'
+      dest = 'event.action'
+      map = {
+        'system.iwa.create' = 'create_resource'
+        'system.iwa.go_offline' = 'unknown'
+        'system.iwa.go_online' = 'unknown'
+        'system.iwa.promote_primary' = 'unknown'
+        'system.iwa.remove' = 'delete_resource'
+        'system.iwa.update' = 'update_resource'
+        'system.iwa.use_default' = 'unknown'
+      }
+    }
+  }
+  if ('raw_event_data.eventType' starts_with 'system.iwa_agentless') {
+    translate {
+      src = 'raw_event_data.eventType'
+      dest = 'event.action'
+      map = {
+        'system.iwa_agentless.auth' = 'authenticate_user'
+        'system.iwa_agentless.redirect' = 'authenticate_user'
+        'system.iwa_agentless.update' = 'update_resource'
+        'system.iwa_agentless.not_found' = 'authenticate_user'
+        'system.iwa_agentless.user.not_found' = 'authenticate_user'
+        'system.iwa_agentless_kerberos.update' = 'update_resource'
+      }
+    }
+  }
+  if ('raw_event_data.eventType' starts_with 'system.ldapi') {
+    if ('raw_event_data.eventType' == 'system.ldapi.bind') {
+      set { dest = 'event.action', value = 'unknown'}
+    }
+    if ('raw_event_data.eventType' == 'system.ldapi.search') {
+      set { dest = 'event.action', value = 'read_resource'}
+    }
+    if ('raw_event_data.eventType' == 'system.ldapi.unbind') {
+      set { dest = 'event.action', value = 'unknown'}
+    }
+  }
+  if ('raw_event_data.eventType' starts_with 'system.mfa') {
+    if ('raw_event_data.eventType' == 'system.mfa.factor.activate') {
+      set { dest = 'event.action', value = 'enable_mfa'}
+    }
+    if ('raw_event_data.eventType' == 'system.mfa.factor.deactivate') {
+      set { dest = 'event.action', value = 'disable_mfa'}
+    }
+  }
+  if ('raw_event_data.eventType' starts_with 'system.org') {
+    translate {
+      src = 'raw_event_data.eventType'
+      dest = 'event.action'
+      map = {
+        'system.org.lifecycle.create' = 'create_organization'
+        'system.org.rate_limit.expiration.warning' = 'alert_api'
+        'system.org.rate_limit.violation' = 'alert_api'
+        'system.org.rate_limit.warning' = 'alert_api'
+        'system.org.task.remove' = 'delete_resource'
+      }
+    }
+  }
+  if ('raw_event_data.eventType' starts_with 'system.push') {
+    if ('raw_event_data.eventType' == 'system.push.send_factor_verify_push') {
+      set { dest = 'event.action', value = 'notify_mfa'}
+    }
+  }
+  if ('raw_event_data.eventType' starts_with 'system.sms') {
+      translate {
+      src = 'raw_event_data.eventType'
+      dest = 'event.action'
+      map = {
+        'system.sms.receive_status' = 'update_status'
+        'system.sms.send_account_unlock_message' = 'unlock_user'
+        'system.sms.send_factor_verify_message' = 'notify_mfa'
+        'system.sms.send_okta_push_verify_message' = 'notify_mfa'
+        'system.sms.send_password_reset_message' = 'reset_password'
+        'system.sms.send_phone_verification_message' = 'notify_mfa'
+      }
+    }
+  }
+  if ('raw_event_data.eventType' starts_with 'system.voice') {
+    translate {
+      src = 'raw_event_data.eventType'
+      dest = 'event.action'
+      map = {
+        'system.voice.receive_status' = 'update_status'
+        'system.voice.send_account_unlock_call' = 'unlock_user'
+        'system.voice.send_call' = 'notify_mfa'
+        'system.voice.send_mfa_challenge_call' = 'notify_mfa'
+        'system.voice.send_password_reset_call' = 'reset_password'
+        'system.voice.send_phone_verification_call' = 'notify_mfa'
+      }
+    }
+  }
+}
+
+if ('raw_event_data.eventType' starts_with 'task') {
+  set { dest = 'resource.type', value = 'task'}
+  translate {
+    src = 'raw_event_data.eventType'
+    dest = 'event.action'
+    map = {
+      'task.lifecycle.activate' = 'enable_resource'
+      'task.lifecycle.create' = 'create_resource'
+      'task.lifecycle.deactivate' = 'disable_resource'
+      'task.lifecycle.delete' = 'delete_resource'
+      'task.lifecycle.update' = 'update_resource'
+    }
+  }
+}
+
+if ('raw_event_data.eventType' starts_with 'user') {
+  if ('raw_event_data.eventType' starts_with 'user.account') {
+    translate {
+      src = 'raw_event_data.eventType'
+      dest = 'event.action'
+      map = {
+        'user.account.access_super_user_app' = 'access_app'
+        'user.account.expire_password' = 'expire_password'
+        'user.account.lock' = 'lock_user'
+        'user.account.lock.limit' = 'lock_user'
+        'user.account.preference_update' = 'update_resource'
+        'user.account.privilege.grant' = 'add_permission'
+        'user.account.privilege.revoke' = 'remove_permission'
+        'user.account.report_suspicious_activity_by_enduser' = 'alert_user'
+        'user.account.reset_password' = 'update_password'
+        'user.account.unlock' = 'unlock_user'
+        'user.account.unlock_by_admin' = 'unlock_user'
+        'user.account.unlock_failure' = 'unlock_user'
+        'user.account.unlock_token' = 'unlock_token'
+        'user.account.update_password' = 'update_password'
+        'user.account.update_primary_email' = 'update_user'
+        'user.account.update_profile' = 'update_user'
+        'user.account.update_secondary_email' = 'update_user'
+        'user.account.update_user_type' = 'update_role'
+        'user.account.use_token' = 'evaluate_token'
+      }
+    }
+    if ('raw_event_data.eventType' == 'user.account.update_profile') {
+      if ('labels.changed_attributes' exists) {
+        regex_capture {
+          src = 'labels.changed_attributes'
+          dest = 'temp_changed_attributes'
+          regex = '\b(email)\b'
+        }
+        if ('temp_changed_attributes.[0].[0]' == 'email') {
+          set { dest = 'labels.field', value = 'primary_email' }
+        }
+        del { src = 'temp_changed_attributes' }
+      }
+    }
+    if ('raw_event_data.eventType' == 'user.account.update_primary_email') {
+      set { dest = 'labels.field', value = 'primary_email' }
+    }
+    if ('raw_event_data.eventType' == 'user.account.update_secondary_email') {
+      set { dest = 'labels.field', value = 'secondary_email' }
+    }
+  }
+  if ('raw_event_data.eventType' starts_with 'user.authentication') {
+    translate {
+      src = 'raw_event_data.eventType'
+      dest = 'event.action'
+      default = 'authenticate_user'
+      map = {
+        'user.authentication.auth' = 'authenticate_user'
+        'user.authentication.auth_via_AD_app' = 'authenticate_user'
+        'user.authentication.auth_via_AD_agent' = 'authenticate_user'
+        'user.authentication.auth_via_IDP' = 'authenticate_user'
+        'user.authentication.auth_via_LDAP_agent' = 'authenticate_user'
+        'user.authentication.auth_via_LDAP_app' = 'authenticate_user'
+        'user.authentication.auth_via_inbound_SAML' = 'authenticate_user'
+        'user.authentication.auth_via_inbound_delauth' = 'authenticate_user'
+        'user.authentication.auth_via_iwa' = 'authenticate_user'
+        'user.authentication.auth_via_mfa' = 'verify_user'
+        'user.authentication.auth_via_radius' = 'authenticate_user'
+        'user.authentication.auth_via_richclient' = 'authenticate_user'
+        'user.authentication.auth_via_social' = 'authenticate_user'
+        'user.authentication.auth_unconfigured_identifier' = 'authenticate_user'
+        'user.authentication.authenticate' = 'authenticate_user'
+        'user.authentication.dsso_via_non_priority_source' = 'authenticate_user'
+        'user.authentication.slo' = 'logout_user'
+        'user.authentication.sso' = 'access_app'
+        'user.authentication.verify' = 'verify_user'
+        'user.authentication.universal_logout' = 'logout_user'
+        'user.authentication.universal_logout.scheduled' = 'logout_user'
+      }
+    }
+  }
+  if ('raw_event_data.eventType' starts_with 'user.behavior') {
+    if ('raw_event_data.eventType' == 'user.behavior.profile.reset') {
+      set { dest = 'event.action', value = 'reset_password'}
+    }
+  }
+  if ('raw_event_data.eventType' starts_with 'user.credential') {
+    if ('raw_event_data.eventType' == 'user.credential.enroll') {
+      set { dest = 'event.action', value = 'enroll_certificate'}
+    }
+  }
+  if ('raw_event_data.eventType' starts_with 'user.identity') {
+    if ('raw_event_data.eventType' == 'user.identity_snapshot.attestation.create') {
+      set { dest = 'event.action', value = 'create_resource'}
+    }
+  }
+  if ('raw_event_data.eventType' starts_with 'user.import') {
+    if ('raw_event_data.eventType' == 'user.import.password') {
+      set { dest = 'event.action', value = 'update_password'}
+    }
+  }
+  if ('raw_event_data.eventType' starts_with 'user.lifecycle') {
+    translate {
+      src = 'raw_event_data.eventType'
+      dest = 'event.action'
+      map = {
+        'user.lifecycle.activate' = 'enable_user'
+        'user.lifecycle.create' = 'create_user'
+        'user.lifecycle.deactivate' = 'disable_user'
+        'user.lifecycle.delete.completed' = 'delete_user'
+        'user.lifecycle.delete.initiated' = 'delete_user'
+        'user.lifecycle.jit.error.read_only' = 'create_user'
+        'user.lifecycle.password_mass_expiry' = 'expire_password'
+        'user.lifecycle.reactivate' = 'enable_user'
+        'user.lifecycle.suspend' = 'lock_user'
+        'user.lifecycle.unsuspend' = 'unlock_user'
+      }
+    }
+  }
+  if ('raw_event_data.eventType' starts_with 'user.mfa') {
+    translate {
+      src = 'raw_event_data.eventType'
+      dest = 'event.action'
+      map = {
+        'user.mfa.attempt_bypass' = 'alert_mfa'
+        'user.mfa.factor.activate' = 'add_mfa'
+        'user.mfa.factor.deactivate' = 'remove_mfa'
+        'user.mfa.factor.reset_all' = 'remove_mfa'
+        'user.mfa.factor.update' = 'change_mfa'
+        'user.mfa.okta_verify' = 'verify_mfa'
+        'user.mfa.okta_verify.deny_push' = 'verify_mfa'
+        'user.mfa.okta_verify.deny_push_upgrade_needed' = 'verify_mfa'
+        'user.mfa.factor.suspend' = 'remove_mfa'
+        'user.mfa.factor.unsuspend' = 'add_mfa'
+      }
+    }
+    if ('raw_event_data.eventType' contains 'user.mfa.okta_verify.deny_push') {
+      set { dest = 'event.outcome', value = 'failure'}
+    }
+  }
+  if ('raw_event_data.eventType' starts_with 'user.session') {
+    translate {
+      src = 'raw_event_data.eventType'
+      dest = 'event.action'
+      map = {
+        'user.session.access_admin_app' = 'access_app'
+        'user.session.clear' = 'end_session'
+        'user.session.end' = 'logout_user'
+        'user.session.expire' = 'expire_session'
+        'user.session.impersonation.end' = 'impersonate_user'
+        'user.session.impersonation.extend' = 'impersonate_user'
+        'user.session.impersonation.grant' = 'approve_access'
+        'user.session.impersonation.initiate' = 'impersonate_user'
+        'user.session.impersonation.revoke' = 'revoke_access'
+        'user.session.start' = 'login_user'
+      }
+    }
+  if ('raw_event_data.eventType' starts_with 'user.risk') {
+    translate {
+      src = 'raw_event_data.eventType'
+      dest = 'event.action'
+      map = {
+        'user.risk.change' = 'update_resource'
+        'user.risk.detect' = 'alert_event'
+      }
+    }
+
+  if ('raw_event_data.eventType' starts_with 'user.session') {
+    translate {
+      src = 'raw_event_data.eventType'
+      dest = 'event.action'
+      map = {
+        'user.session.context.change' = 'update_resource'
+      }
+    }
+  }
+}
+
+if ('raw_event_data.eventType' starts_with 'workflows') {
+  translate {
+    src = 'raw_event_data.eventType'
+    dest = 'event.action'
+    map = {
+      'workflows.user.connection.create' = 'create_workflow'
+      'workflows.user.connection.delete' = 'delete_workflow'
+      'workflows.user.connection.reauthorize' = 'update_workflow'
+      'workflows.user.connection.revoke' = 'disable_workflow'
+      'workflows.user.delegatedflow.run' = 'execute_workflow'
+      'workflows.user.execution_log_stream_connection.activate' = 'enable_resource'
+      'workflows.user.execution_log_stream_connection.deactivate' = 'disable_resource'
+      'workflows.user.execution_log_stream_connection.update' = 'update_resource'
+      'workflows.user.flow.activate' = 'enable_workflow'
+      'workflows.user.flow.create' = 'create_workflow'
+      'workflows.user.flow.deactivate' = 'disable_workflow'
+      'workflows.user.flow.delete' = 'delete_workflow'
+      'workflows.user.flow.execution.cancel' = 'cancel_workflow'
+      'workflows.user.flow.execution_history.activate' = 'enable_resource'
+      'workflows.user.flow.execution_history.deactivate' = 'disable_resource'
+      'workflows.user.flow.execution_history.delete' = 'delete_request'
+      'workflows.user.flow.execution_log_stream.activate' = 'enable_resource'
+      'workflows.user.flow.execution_log_stream.deactivate' = 'disable_resource'
+      'workflows.user.flow.export' = 'download_resource'
+      'workflows.user.flow.import' = 'import_resource'
+      'workflows.user.flow.move' = 'move_resource'
+      'workflows.user.flow.save' = 'update_workflow'
+      'workflows.user.folder.create' = 'create_resource'
+      'workflows.user.folder.delete' = 'delete_resource'
+      'workflows.user.folder.duplicate' = 'alert_event'
+      'workflows.user.folder.export' = 'download_resource'
+      'workflows.user.folder.import' = 'import_resource'
+      'workflows.user.folder.move' = 'move_resource'
+      'workflows.user.folder.rename' = 'update_resource'
+      'workflows.user.role.group.add' = 'add_user'
+      'workflows.user.role.group.remove' = 'remove_user'
+      'workflows.user.role.user.add' = 'add_user'
+      'workflows.user.role.user.remove' = 'remove_user'
+      'workflows.user.table.create' = 'create_resource'
+      'workflows.user.table.delete' = 'delete_resource'
+      'workflows.user.table.export' = 'download_resource'
+      'workflows.user.table.import' = 'import_resource'
+      'workflows.user.table.move' = 'move_resource'
+      'workflows.user.table.schema.export' = 'download_resource'
+      'workflows.user.table.schema.import' = 'import_resource'
+      'workflows.user.table.update' = 'update_resource'
+      'workflows.user.table.view' = 'read_resource'
+    }
+  }
+  if ('raw_event_data.eventType' starts_with 'workflows.user.folder') {
+    set { dest = 'resource.type', value = 'folder'}
+  }
+  if ('raw_event_data.eventType' starts_with 'workflows.user.table') {
+    set { dest = 'resource.type', value = 'table'}
+  }
+}
+
+if ('raw_event_data.eventType' starts_with 'zone') {
+  translate {
+    src = 'raw_event_data.eventType'
+    dest = 'event.action'
+    map = {
+      'zone.activate' = 'enable_rule'
+      'zone.create' = 'create_rule'
+      'zone.deactivate' = 'disable_rule'
+      'zone.delete' = 'delete_rule'
+      'zone.make_blacklist' = 'create_rule'
+      'zone.remove_blacklist' = 'remove_rule'
+      'zone.update' = 'update_rule'
+    }
+  }
+}
+
+# set event types
+if ('event.code' contains '.start' or 'event.code' contains '.initiate') {
+  append { dest = 'event.type', value = 'start' }
+}
+if ('event.code' contains '.end' or 'event.code' contains '.complete') {
+  append { dest = 'event.type', value = 'end' }
+}
+if ('event.code' contains 'admin' or 'event.code' contains 'super_user' or 'event.action' contains 'admin') {
+  append { dest = 'event.type', value = 'admin' }
+}
+if ('event.action' contains 'create') {
+  append { dest = 'event.type', value = 'creation' }
+}
+if ('event.action' contains 'update') {
+  append { dest = 'event.type', value = 'change' }
+}
+if ('event.action' contains 'delete') {
+  append { dest = 'event.type', value = 'deletion' }
+}
+if ('event.action' contains 'download') {
+  append { dest = 'event.type', value = 'access' }
+}
+if ('event.action' contains 'login') {
+  append { dest = 'event.type', value = 'access' }
+}
+
+# set event outcome
+if ('event.code' contains 'failure' or 'event.code' contains 'failed' or 'event.code' contains 'error' or 'event.code' contains 'not_found' or 'event.code' contains 'warn.skipped') {
+  set { dest = 'event.outcome', value = 'failure' }
+}
+if ('event.code' contains 'success') {
+  if ('event.outcome' not exists) {
+    set { dest = 'event.outcome', value = 'success' }
+  }
+}
+
+to_lower { src = 'event.outcome' }
+del { src = 'raw_event_data' }
